@@ -187,6 +187,26 @@ async function openOrderModal(orderId, onSavedFn) {
     e.preventDefault();
     saveOrder(order, orderId, onSavedFn);
   });
+
+  // Print PDF
+  document.getElementById('btn-print-order')?.addEventListener('click', async () => {
+    if (!orderId) { toast('Guarda el pedido primero para imprimir', 'warning'); return; }
+    const btn = document.getElementById('btn-print-order');
+    setLoading(btn, true);
+    try { await exportOrderPDF(orderId); }
+    catch (e) { toast('Error al generar PDF: ' + e.message, 'error'); }
+    finally { setLoading(btn, false); }
+  });
+
+  // Export Excel
+  document.getElementById('btn-excel-order')?.addEventListener('click', async () => {
+    if (!orderId) { toast('Guarda el pedido primero para exportar', 'warning'); return; }
+    const btn = document.getElementById('btn-excel-order');
+    setLoading(btn, true);
+    try { await exportOrderExcel(orderId); }
+    catch (e) { toast('Error al exportar: ' + e.message, 'error'); }
+    finally { setLoading(btn, false); }
+  });
 }
 
 function buildOrderFormHTML(order, clients, providers, orderId) {
@@ -458,8 +478,6 @@ async function saveOrder(originalOrder, orderId, onSavedFn) {
     toast(orderId ? 'Pedido actualizado' : 'Pedido creado');
     closeModal();
     if (onSavedFn) onSavedFn();
-
-    // PDF / Excel buttons in modal footer
   } catch (err) {
     toast('Error: ' + err.message, 'error');
   } finally {
@@ -535,4 +553,51 @@ export async function exportOrderPDF(orderId) {
   }
 
   doc.save(`${order.order_number}.pdf`);
+}
+
+export async function exportOrderExcel(orderId) {
+  const { data: order } = await db.from('orders')
+    .select('*, clients(*), users(name), providers(name)')
+    .eq('id', orderId).single();
+  const { data: items } = await db.from('order_items')
+    .select('quantity, unit_sale_price, unit_cost_price, product_variants(color, size, products(code, description))')
+    .eq('order_id', orderId);
+
+  const sub  = (items || []).reduce((a, i) => a + i.quantity * i.unit_sale_price, 0);
+  const disc = sub * ((order.discount_pct || 0) / 100);
+  const total = sub - disc;
+
+  const header = ['Código', 'Descripción', 'Color', 'Talla', 'Cantidad', 'P.Venta', 'P.Costo', 'Subtotal'];
+  const rows = (items || []).map(i => [
+    i.product_variants?.products?.code        || '–',
+    i.product_variants?.products?.description || '–',
+    i.product_variants?.color || '–',
+    i.product_variants?.size  || '–',
+    i.quantity,
+    i.unit_sale_price,
+    i.unit_cost_price,
+    i.quantity * i.unit_sale_price
+  ]);
+
+  // Info block at top
+  const info = [
+    [`Pedido: ${order.order_number}`],
+    [`Cliente: ${order.clients?.name || '–'}`],
+    [`Proveedor: ${order.providers?.name || '–'}`],
+    [`Vendedor: ${order.users?.name || '–'}`],
+    [`Temporada: ${order.season || '–'}`],
+    [],
+    header,
+    ...rows,
+    [],
+    ['', '', '', '', '', '', 'Subtotal', sub],
+    ['', '', '', '', '', '', `Descuento (${order.discount_pct || 0}%)`, -disc],
+    ['', '', '', '', '', '', 'TOTAL', total]
+  ];
+
+  const ws = window.XLSX.utils.aoa_to_sheet(info);
+  ws['!cols'] = [12, 22, 10, 8, 10, 10, 10, 12].map(w => ({ wch: w }));
+  const wb = window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(wb, ws, order.order_number);
+  window.XLSX.writeFile(wb, `${order.order_number}.xlsx`);
 }

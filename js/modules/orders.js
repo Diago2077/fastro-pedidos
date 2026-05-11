@@ -1,0 +1,538 @@
+import { db } from '../supabase.js';
+import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, fCurrency, fDate, statusBadge, esc } from '../utils/helpers.js';
+import { exportPDF, exportExcel } from '../utils/export.js';
+import { getSession } from '../auth.js';
+
+// In-memory state for order editing
+let _state = {
+  items: [],     // { variantId, code, description, color, size, qty, salePrice, costPrice }
+  orderId: null
+};
+let _allOrders = [];
+
+export async function renderOrders(container) {
+  container.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-actions">
+          <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="q-ord" placeholder="Buscar por N° o cliente…" class="form-control">
+          </div>
+          <select id="filter-status" class="form-control form-control-sm" style="width:auto">
+            <option value="">Todos los estados</option>
+            <option value="open">Abiertos</option>
+            <option value="closed">Cerrados</option>
+            <option value="sent">Enviados</option>
+          </select>
+          <button class="btn btn-accent" onclick="window._ord.new()"><i class="fas fa-plus"></i> Nuevo Pedido</button>
+        </div>
+      </div>
+      <div class="table-responsive" id="ord-tbl"></div>
+    </div>`;
+
+  async function load(q = '', status = '') {
+    let query = db.from('orders')
+      .select('id, order_number, status, season, discount_pct, created_at, shipping_date, clients(name), users(name), providers(name)')
+      .order('created_at', { ascending: false });
+    if (q) query = query.or(`order_number.ilike.%${q}%`);
+    if (status) query = query.eq('status', status);
+    const { data, error } = await query;
+    if (error) { toast('Error al cargar pedidos', 'error'); return; }
+    _allOrders = data || [];
+
+    // Fetch totals per order
+    const { data: items } = await db.from('order_items').select('order_id, quantity, unit_sale_price');
+    const totByOrder = {};
+    (items || []).forEach(i => { totByOrder[i.order_id] = (totByOrder[i.order_id] || 0) + i.quantity * i.unit_sale_price; });
+
+    render(_allOrders, totByOrder);
+  }
+
+  function render(rows, totByOrder = {}) {
+    const el = document.getElementById('ord-tbl');
+    if (!el) return;
+    if (!rows.length) { el.innerHTML = emptyState('No hay pedidos'); return; }
+    el.innerHTML = `<table class="table table-hover">
+      <thead><tr><th>N° Pedido</th><th>Cliente</th><th>Vendedor</th><th>Proveedor</th><th>Temporada</th><th>Total</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+      <tbody>
+        ${rows.map(o => {
+          const sub = totByOrder[o.id] || 0;
+          const tot = sub * (1 - (o.discount_pct || 0) / 100);
+          return `<tr>
+            <td><strong>${esc(o.order_number)}</strong></td>
+            <td>${esc(o.clients?.name || '–')}</td>
+            <td>${esc(o.users?.name || '–')}</td>
+            <td>${esc(o.providers?.name || '–')}</td>
+            <td>${esc(o.season || '–')}</td>
+            <td>${fCurrency(tot)}</td>
+            <td>${statusBadge(o.status)}</td>
+            <td>${fDate(o.created_at)}</td>
+            <td class="td-actions">
+              <button class="btn btn-xs btn-outline" title="Ver / Editar" onclick="window._ord.open('${o.id}')"><i class="fas fa-eye"></i></button>
+              <button class="btn btn-xs btn-danger-outline" title="Eliminar" onclick="window._ord.del('${o.id}')"><i class="fas fa-trash"></i></button>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+  }
+
+  window._ord = {
+    new() { openOrderModal(null, () => load()); },
+    open(id) { openOrderModal(id, () => load()); },
+    async del(id) {
+      if (!await confirm2('¿Eliminar este pedido definitivamente?')) return;
+      await db.from('orders').delete().eq('id', id);
+      toast('Pedido eliminado'); load();
+    }
+  };
+
+  document.getElementById('q-ord')?.addEventListener('input', debounce(e => {
+    load(e.target.value.trim(), document.getElementById('filter-status').value);
+  }, 300));
+  document.getElementById('filter-status')?.addEventListener('change', e => {
+    load(document.getElementById('q-ord').value.trim(), e.target.value);
+  });
+
+  load();
+}
+
+// ============================================================
+// ORDER MODAL (create / edit)
+// ============================================================
+async function openOrderModal(orderId, onSavedFn) {
+  _state = { items: [], orderId };
+
+  // Parallel data fetch
+  const [clientsRes, provsRes, cfgRes] = await Promise.all([
+    db.from('clients').select('id, name').eq('active', true).order('name'),
+    db.from('providers').select('id, name').eq('active', true).order('name'),
+    db.from('app_config').select('key, value')
+  ]);
+
+  const clients   = clientsRes.data || [];
+  const providers = provsRes.data  || [];
+  const cfg       = Object.fromEntries((cfgRes.data || []).map(r => [r.key, r.value]));
+
+  let order = { season: cfg.current_season || '', discount_pct: 0, status: 'open' };
+  if (orderId) {
+    const { data } = await db.from('orders').select('*').eq('id', orderId).single();
+    order = data || order;
+    // Load existing items
+    const { data: existing } = await db
+      .from('order_items')
+      .select('id, quantity, unit_sale_price, unit_cost_price, product_variants(id, color, size, products(id, code, description))')
+      .eq('order_id', orderId);
+    _state.items = (existing || []).map(i => ({
+      itemId:      i.id,
+      variantId:   i.product_variants?.id,
+      code:        i.product_variants?.products?.code || '',
+      description: i.product_variants?.products?.description || '',
+      color:       i.product_variants?.color || '',
+      size:        i.product_variants?.size  || '',
+      qty:         i.quantity,
+      salePrice:   i.unit_sale_price,
+      costPrice:   i.unit_cost_price
+    }));
+  }
+
+  const html = buildOrderFormHTML(order, clients, providers, orderId);
+  openModal(orderId ? `Pedido ${order.order_number}` : 'Nuevo Pedido', html, { size: 'xl' });
+
+  // Render items table
+  renderItemsTable();
+  updateTotals();
+
+  // Product search autocomplete
+  const searchInput = document.getElementById('prod-search');
+  const searchResults = document.getElementById('prod-results');
+
+  searchInput?.addEventListener('input', debounce(async e => {
+    const q = e.target.value.trim();
+    if (q.length < 2) { searchResults.classList.add('hidden'); return; }
+    const { data } = await db.from('products')
+      .select('id, code, description, product_variants(id, color, size, sale_price, cost_price)')
+      .eq('active', true)
+      .or(`code.ilike.%${q}%,description.ilike.%${q}%`)
+      .limit(10);
+    if (!data?.length) { searchResults.innerHTML = '<div class="sr-item text-muted">Sin resultados</div>'; searchResults.classList.remove('hidden'); return; }
+    searchResults.innerHTML = data.map(p => `
+      <div class="sr-item" data-id="${p.id}" data-code="${esc(p.code)}" data-desc="${esc(p.description)}">
+        <strong>${esc(p.code)}</strong> — ${esc(p.description)}
+      </div>`).join('');
+    searchResults.classList.remove('hidden');
+
+    // Store variants data for later
+    searchResults._productMap = Object.fromEntries(data.map(p => [p.id, p]));
+  }, 250));
+
+  searchResults?.addEventListener('click', e => {
+    const item = e.target.closest('.sr-item[data-id]');
+    if (!item) return;
+    const productId = item.dataset.id;
+    const product   = searchResults._productMap?.[productId];
+    if (product) showProductGrid(product);
+    searchInput.value = `${item.dataset.code} — ${item.dataset.desc}`;
+    searchResults.classList.add('hidden');
+  });
+
+  // Dismiss results on outside click
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#prod-search-wrap')) searchResults?.classList.add('hidden');
+  }, { once: true });
+
+  // Form submit
+  document.getElementById('order-form')?.addEventListener('submit', e => {
+    e.preventDefault();
+    saveOrder(order, orderId, onSavedFn);
+  });
+}
+
+function buildOrderFormHTML(order, clients, providers, orderId) {
+  const clientOpts   = clients.map(c => `<option value="${c.id}" ${order.client_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  const providerOpts = providers.map(p => `<option value="${p.id}" ${order.provider_id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+  const statusMap    = { open: 'Abierto', closed: 'Cerrado', sent: 'Enviado' };
+
+  return `
+  <form id="order-form">
+    <!-- HEADER -->
+    <div class="order-header-grid">
+      ${orderId ? `<div class="form-group"><label class="form-label">N° Pedido</label>
+        <input class="form-control" value="${esc(order.order_number || '')}" readonly></div>` : ''}
+      <div class="form-group">
+        <label class="form-label req">Cliente</label>
+        <select name="client_id" class="form-control" required>
+          <option value="">— Seleccionar —</option>
+          ${clientOpts}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label req">Proveedor</label>
+        <select name="provider_id" class="form-control" required>
+          <option value="">— Seleccionar —</option>
+          ${providerOpts}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Temporada</label>
+        <input type="text" name="season" class="form-control" value="${esc(order.season || '')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descuento (%)</label>
+        <input type="number" name="discount_pct" class="form-control" min="0" max="100" step="0.1"
+          value="${order.discount_pct || 0}" id="discount-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fecha de Envío</label>
+        <input type="date" name="shipping_date" class="form-control"
+          value="${order.shipping_date || ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estado</label>
+        <select name="status" class="form-control">
+          ${Object.entries(statusMap).map(([k, v]) => `<option value="${k}" ${order.status === k ? 'selected' : ''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group span-full">
+        <label class="form-label">Observación</label>
+        <textarea name="observation" class="form-control" rows="2">${esc(order.observation || '')}</textarea>
+      </div>
+    </div>
+
+    <!-- PRODUCT SEARCH -->
+    <div class="section-divider"><i class="fas fa-search"></i> Agregar Productos</div>
+    <div id="prod-search-wrap" style="position:relative;margin-bottom:12px">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" id="prod-search" class="form-control" placeholder="Buscar producto por código o descripción…" autocomplete="off">
+      </div>
+      <div id="prod-results" class="search-results hidden"></div>
+    </div>
+
+    <!-- PRODUCT GRID (shown after selection) -->
+    <div id="product-grid-wrap"></div>
+
+    <!-- ORDER ITEMS TABLE -->
+    <div class="section-divider"><i class="fas fa-list"></i> Ítems del Pedido</div>
+    <div class="table-responsive" id="items-tbl"></div>
+
+    <!-- TOTALS -->
+    <div class="order-totals">
+      <div class="totals-row"><span>Subtotal</span><span id="tot-sub">$0.00</span></div>
+      <div class="totals-row"><span>Descuento (<span id="tot-disc-pct">0</span>%)</span><span id="tot-disc">-$0.00</span></div>
+      <div class="totals-row totals-final"><span>TOTAL</span><span id="tot-final">$0.00</span></div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="form-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button type="button" class="btn btn-outline" id="btn-print-order"><i class="fas fa-file-pdf"></i> Imprimir</button>
+      <button type="button" class="btn btn-outline" id="btn-excel-order"><i class="fas fa-file-excel"></i> Excel</button>
+      <button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar Pedido</button>
+    </div>
+  </form>`;
+}
+
+// ============================================================
+// PRODUCT GRID
+// ============================================================
+function showProductGrid(product) {
+  const wrap = document.getElementById('product-grid-wrap');
+  if (!wrap) return;
+
+  const variants  = product.product_variants || [];
+  const colors    = [...new Set(variants.map(v => v.color))].sort();
+  const sizes     = [...new Set(variants.map(v => v.size))].sort();
+  const variantMap = {};
+  variants.forEach(v => { variantMap[`${v.color}|||${v.size}`] = v; });
+
+  const priceRow = sizes.map(s => {
+    const anyVar = variants.find(v => v.size === s);
+    return `<th class="text-center"><div>${esc(s)}</div><div class="sz-price">${fCurrency(anyVar?.sale_price || 0)}</div></th>`;
+  }).join('');
+
+  const bodyRows = colors.map(color => {
+    const cells = sizes.map(size => {
+      const v = variantMap[`${color}|||${size}`];
+      if (!v) return `<td class="cell-na">–</td>`;
+      return `<td class="text-center"><input type="number" min="0" class="form-control form-control-sm grid-qty text-center"
+        data-variant-id="${v.id}" data-code="${esc(product.code)}" data-desc="${esc(product.description)}"
+        data-color="${esc(color)}" data-size="${esc(size)}"
+        data-sale="${v.sale_price}" data-cost="${v.cost_price}"
+        placeholder="0" style="width:65px"></td>`;
+    }).join('');
+    return `<tr><td><strong>${esc(color)}</strong></td>${cells}</tr>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="product-grid-card">
+      <div class="product-grid-title">
+        <strong>${esc(product.code)}</strong> — ${esc(product.description)}
+        <button type="button" class="btn btn-xs btn-danger-outline float-end" id="btn-close-grid"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm product-grid-table">
+          <thead><tr><th>Color</th>${priceRow}</tr></thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </div>
+      <div class="text-end mt-2">
+        <button type="button" class="btn btn-accent btn-sm" id="btn-add-to-order">
+          <i class="fas fa-cart-plus"></i> Agregar al Pedido
+        </button>
+      </div>
+    </div>`;
+
+  document.getElementById('btn-close-grid')?.addEventListener('click', () => { wrap.innerHTML = ''; });
+
+  document.getElementById('btn-add-to-order')?.addEventListener('click', () => {
+    const inputs = [...wrap.querySelectorAll('.grid-qty')].filter(i => parseInt(i.value) > 0);
+    if (!inputs.length) { toast('Ingresa al menos una cantidad', 'warning'); return; }
+    inputs.forEach(inp => {
+      const qty = parseInt(inp.value);
+      if (qty <= 0) return;
+      // Remove duplicate variant if already exists
+      _state.items = _state.items.filter(item => item.variantId !== inp.dataset.variantId);
+      _state.items.push({
+        variantId:   inp.dataset.variantId,
+        code:        inp.dataset.code,
+        description: inp.dataset.desc,
+        color:       inp.dataset.color,
+        size:        inp.dataset.size,
+        qty,
+        salePrice:   parseFloat(inp.dataset.sale),
+        costPrice:   parseFloat(inp.dataset.cost)
+      });
+    });
+    renderItemsTable();
+    updateTotals();
+    wrap.innerHTML = '';
+    document.getElementById('prod-search').value = '';
+    toast('Productos agregados', 'success');
+  });
+}
+
+// ============================================================
+// ITEMS TABLE
+// ============================================================
+function renderItemsTable() {
+  const el = document.getElementById('items-tbl');
+  if (!el) return;
+  if (!_state.items.length) { el.innerHTML = emptyState('No hay productos en este pedido'); return; }
+  el.innerHTML = `<table class="table table-sm table-bordered">
+    <thead><tr><th>Código</th><th>Descripción</th><th>Color</th><th>Talla</th><th>Cant.</th><th>P.Venta</th><th>Subtotal</th><th></th></tr></thead>
+    <tbody>
+      ${_state.items.map((item, idx) => `<tr>
+        <td>${esc(item.code)}</td>
+        <td>${esc(item.description)}</td>
+        <td>${esc(item.color)}</td>
+        <td>${esc(item.size)}</td>
+        <td>
+          <input type="number" min="1" value="${item.qty}" class="form-control form-control-sm text-center"
+            style="width:70px" onchange="window._ord.updateQty(${idx}, this.value)">
+        </td>
+        <td>${fCurrency(item.salePrice)}</td>
+        <td>${fCurrency(item.qty * item.salePrice)}</td>
+        <td><button type="button" class="btn btn-xs btn-danger-outline" onclick="window._ord.removeItem(${idx})"><i class="fas fa-times"></i></button></td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function updateTotals() {
+  const sub   = _state.items.reduce((acc, i) => acc + i.qty * i.salePrice, 0);
+  const disc  = parseFloat(document.getElementById('discount-input')?.value || 0);
+  const discAmt = sub * (disc / 100);
+  const total = sub - discAmt;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('tot-sub', fCurrency(sub));
+  set('tot-disc-pct', disc.toFixed(1));
+  set('tot-disc', '-' + fCurrency(discAmt));
+  set('tot-final', fCurrency(total));
+}
+
+document.addEventListener('input', e => {
+  if (e.target.id === 'discount-input') updateTotals();
+});
+
+// Exposed methods for inline event handlers
+window._ord = window._ord || {};
+Object.assign(window._ord, {
+  updateQty(idx, val) {
+    if (_state.items[idx]) { _state.items[idx].qty = Math.max(1, parseInt(val) || 1); renderItemsTable(); updateTotals(); }
+  },
+  removeItem(idx) { _state.items.splice(idx, 1); renderItemsTable(); updateTotals(); }
+});
+
+// ============================================================
+// SAVE ORDER
+// ============================================================
+async function saveOrder(originalOrder, orderId, onSavedFn) {
+  const form = document.getElementById('order-form');
+  const btn  = form.querySelector('[type=submit]');
+  setLoading(btn, true);
+
+  const fd = new FormData(form);
+  const payload = {
+    client_id:    fd.get('client_id')    || null,
+    provider_id:  fd.get('provider_id')  || null,
+    season:       fd.get('season')       || null,
+    discount_pct: parseFloat(fd.get('discount_pct')) || 0,
+    shipping_date: fd.get('shipping_date') || null,
+    status:       fd.get('status'),
+    observation:  fd.get('observation')  || null,
+    updated_at:   new Date().toISOString()
+  };
+
+  try {
+    let finalOrderId = orderId;
+
+    if (orderId) {
+      const { error } = await db.from('orders').update(payload).eq('id', orderId);
+      if (error) throw error;
+    } else {
+      const session = getSession();
+      const { data, error } = await db.from('orders')
+        .insert({ ...payload, user_id: session?.id })
+        .select('id').single();
+      if (error) throw error;
+      finalOrderId = data.id;
+    }
+
+    // Replace order items: delete all then re-insert
+    await db.from('order_items').delete().eq('order_id', finalOrderId);
+
+    if (_state.items.length) {
+      const itemPayloads = _state.items.map(i => ({
+        order_id:           finalOrderId,
+        product_variant_id: i.variantId,
+        quantity:           i.qty,
+        unit_sale_price:    i.salePrice,
+        unit_cost_price:    i.costPrice
+      }));
+      const { error } = await db.from('order_items').insert(itemPayloads);
+      if (error) throw error;
+    }
+
+    toast(orderId ? 'Pedido actualizado' : 'Pedido creado');
+    closeModal();
+    if (onSavedFn) onSavedFn();
+
+    // PDF / Excel buttons in modal footer
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+// ============================================================
+// PDF / EXCEL EXPORT FOR AN ORDER
+// ============================================================
+export async function exportOrderPDF(orderId) {
+  const { data: order } = await db.from('orders')
+    .select('*, clients(*), users(name), providers(name)')
+    .eq('id', orderId).single();
+  const { data: items } = await db.from('order_items')
+    .select('quantity, unit_sale_price, unit_cost_price, product_variants(color, size, products(code, description))')
+    .eq('order_id', orderId);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const sub = (items || []).reduce((a, i) => a + i.quantity * i.unit_sale_price, 0);
+  const disc = sub * ((order.discount_pct || 0) / 100);
+  const total = sub - disc;
+
+  // Header
+  doc.setFillColor(17, 17, 17);
+  doc.rect(0, 0, 210, 25, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+  doc.text('FASTRO S.A.', 14, 12);
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.text('PEDIDO DE COMPRA', 14, 19);
+  doc.text(order.order_number, 196, 12, { align: 'right' });
+  doc.text(new Date(order.created_at).toLocaleDateString('es-EC'), 196, 19, { align: 'right' });
+
+  // Info block
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(9);
+  const infoY = 30;
+  doc.text(`Cliente: ${order.clients?.name || '–'}`, 14, infoY);
+  doc.text(`RUC: ${order.clients?.ruc || '–'}`, 14, infoY + 5);
+  doc.text(`Proveedor: ${order.providers?.name || '–'}`, 14, infoY + 10);
+  doc.text(`Vendedor: ${order.users?.name || '–'}`, 110, infoY);
+  doc.text(`Temporada: ${order.season || '–'}`, 110, infoY + 5);
+  doc.text(`Envío: ${order.shipping_date ? fDate(order.shipping_date) : '–'}`, 110, infoY + 10);
+
+  doc.autoTable({
+    startY: infoY + 18,
+    head: [['Código', 'Descripción', 'Color', 'Talla', 'Cant.', 'P.Venta', 'Subtotal']],
+    body: (items || []).map(i => [
+      i.product_variants?.products?.code || '–',
+      i.product_variants?.products?.description || '–',
+      i.product_variants?.color || '–',
+      i.product_variants?.size  || '–',
+      i.quantity,
+      fCurrency(i.unit_sale_price),
+      fCurrency(i.quantity * i.unit_sale_price)
+    ]),
+    headStyles: { fillColor: [155, 0, 0] },
+    foot: [
+      ['', '', '', '', '', 'Subtotal', fCurrency(sub)],
+      ['', '', '', '', '', `Descuento (${order.discount_pct || 0}%)`, '-' + fCurrency(disc)],
+      ['', '', '', '', '', 'TOTAL', fCurrency(total)]
+    ],
+    footStyles: { fontStyle: 'bold' },
+    styles: { fontSize: 8 }
+  });
+
+  if (order.observation) {
+    const finalY = doc.lastAutoTable.finalY + 6;
+    doc.setFontSize(8);
+    doc.text(`Observación: ${order.observation}`, 14, finalY);
+  }
+
+  doc.save(`${order.order_number}.pdf`);
+}

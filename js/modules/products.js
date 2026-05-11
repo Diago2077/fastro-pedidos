@@ -15,6 +15,7 @@ export async function renderProducts(container) {
           </div>
           <button class="btn btn-sm btn-outline" onclick="window._pr.pdf()"><i class="fas fa-file-pdf"></i> PDF</button>
           <button class="btn btn-sm btn-outline" onclick="window._pr.xls()"><i class="fas fa-file-excel"></i> Excel</button>
+          <button class="btn btn-sm btn-outline" onclick="window._pr.importExcel()"><i class="fas fa-file-upload"></i> Importar Excel</button>
           <button class="btn btn-accent" onclick="window._pr.form()"><i class="fas fa-plus"></i> Nuevo Producto</button>
         </div>
       </div>
@@ -106,7 +107,9 @@ export async function renderProducts(container) {
         { key: 'brand', header: 'Marca' }, { key: 'season', header: 'Temporada' }
       ];
       exportExcel('Productos', cols, _all, 'productos.xlsx');
-    }
+    },
+    importExcel() { openImportModal(load); },
+    downloadTemplate
   };
 
   document.getElementById('q-prod')?.addEventListener('input', debounce(e => load(e.target.value.trim()), 300));
@@ -313,4 +316,296 @@ function initProductForm(id, originalProduct, reloadFn) {
       setLoading(btn, false);
     }
   });
+}
+
+// ============================================================
+// IMPORTACIÓN DESDE EXCEL
+// ============================================================
+
+// Normaliza el nombre de columna para hacer el mapeo flexible
+function normalizeHeader(h) {
+  return String(h).toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // quitar tildes
+    .replace(/[^a-z0-9]/g, '');                        // solo alfanumérico
+}
+
+const HEADER_MAP = {
+  codigo:       'code',
+  code:         'code',
+  cod:          'code',
+  descripcion:  'description',
+  description:  'description',
+  desc:         'description',
+  marca:        'brand',
+  brand:        'brand',
+  proveedor:    'provider_name',
+  provider:     'provider_name',
+  temporada:    'season',
+  season:       'season',
+  color:        'color',
+  talla:        'size',
+  size:         'size',
+  talle:        'size',
+  precioventa:  'sale_price',
+  pventa:       'sale_price',
+  saleprice:    'sale_price',
+  pvp:          'sale_price',
+  precio_venta: 'sale_price',
+  preciov:      'sale_price',
+  preciocosto:  'cost_price',
+  pcosto:       'cost_price',
+  costprice:    'cost_price',
+  costo:        'cost_price',
+  precio_costo: 'cost_price',
+  precioc:      'cost_price',
+};
+
+function parseSheetRows(sheet) {
+  const raw = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  if (raw.length < 2) return { rows: [], errors: ['El archivo no tiene datos'] };
+
+  // Map headers
+  const headers = raw[0].map(h => HEADER_MAP[normalizeHeader(h)] || null);
+  const missing = ['code', 'description', 'color', 'size', 'sale_price']
+    .filter(f => !headers.includes(f));
+  if (missing.length) return { rows: [], errors: [`Columnas faltantes: ${missing.join(', ')}`] };
+
+  const rows = [];
+  for (let i = 1; i < raw.length; i++) {
+    const rowRaw = raw[i];
+    if (rowRaw.every(c => !c)) continue; // skip empty rows
+    const row = {};
+    headers.forEach((field, idx) => { if (field) row[field] = rowRaw[idx]; });
+    if (!row.code || !row.description || !row.color || !row.size || !row.sale_price) continue;
+    row.sale_price = parseFloat(String(row.sale_price).replace(',', '.')) || 0;
+    row.cost_price = parseFloat(String(row.cost_price || '0').replace(',', '.')) || 0;
+    row.code        = String(row.code).trim().toUpperCase();
+    row.description = String(row.description).trim();
+    row.color       = String(row.color).trim();
+    row.size        = String(row.size).trim();
+    row.brand       = row.brand ? String(row.brand).trim() : '';
+    row.provider_name = row.provider_name ? String(row.provider_name).trim() : '';
+    row.season      = row.season ? String(row.season).trim() : '';
+    rows.push(row);
+  }
+  return { rows, errors: [] };
+}
+
+export function openImportModal(reloadFn) {
+  const html = `
+    <div class="import-wrap">
+      <!-- Instrucciones -->
+      <div class="import-info">
+        <p class="mb-2"><strong>Formato requerido:</strong> una fila por cada variante (Color + Talla).</p>
+        <table class="table table-sm table-bordered" style="font-size:.82em">
+          <thead><tr><th>Columna</th><th>Descripción</th><th>Req.</th></tr></thead>
+          <tbody>
+            <tr><td><code>Codigo</code></td><td>Código único del producto</td><td>✓</td></tr>
+            <tr><td><code>Descripcion</code></td><td>Nombre del producto</td><td>✓</td></tr>
+            <tr><td><code>Marca</code></td><td>Marca (texto libre)</td><td></td></tr>
+            <tr><td><code>Proveedor</code></td><td>Nombre del proveedor</td><td></td></tr>
+            <tr><td><code>Temporada</code></td><td>Temporada</td><td></td></tr>
+            <tr><td><code>Color</code></td><td>Color de la variante</td><td>✓</td></tr>
+            <tr><td><code>Talla</code></td><td>Talla de la variante</td><td>✓</td></tr>
+            <tr><td><code>PrecioVenta</code></td><td>Precio de venta (número)</td><td>✓</td></tr>
+            <tr><td><code>PrecioCosto</code></td><td>Precio de costo (número)</td><td></td></tr>
+          </tbody>
+        </table>
+        <button class="btn btn-sm btn-outline" onclick="window._pr.downloadTemplate()">
+          <i class="fas fa-download"></i> Descargar plantilla de ejemplo
+        </button>
+      </div>
+
+      <!-- Dropzone -->
+      <div class="dropzone" id="import-dropzone">
+        <i class="fas fa-file-excel" style="font-size:2.5em;color:#38a169;margin-bottom:10px"></i>
+        <p style="margin-bottom:10px;color:var(--text-muted)">Arrastra tu archivo aquí o</p>
+        <label class="btn btn-outline" style="cursor:pointer">
+          <i class="fas fa-folder-open"></i> Seleccionar archivo (.xlsx / .xls / .csv)
+          <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" hidden>
+        </label>
+        <p id="import-filename" style="margin-top:8px;font-size:.8em;color:var(--text-muted)"></p>
+      </div>
+
+      <!-- Preview -->
+      <div id="import-preview" class="hidden">
+        <div id="import-summary" class="import-summary"></div>
+        <div class="table-responsive mt-2" id="import-preview-table" style="max-height:280px;overflow-y:auto"></div>
+        <div class="form-footer">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('import-preview').classList.add('hidden');document.getElementById('import-dropzone').classList.remove('hidden');">
+            <i class="fas fa-arrow-left"></i> Cambiar archivo
+          </button>
+          <button type="button" class="btn btn-accent" id="btn-confirm-import">
+            <i class="fas fa-upload"></i> Confirmar Importación
+          </button>
+        </div>
+      </div>
+    </div>`;
+
+  openModal('Importar Productos desde Excel', html, { size: 'lg' });
+
+  // File input
+  const fileInput = document.getElementById('import-file-input');
+  const dropzone  = document.getElementById('import-dropzone');
+
+  fileInput?.addEventListener('change', e => handleFile(e.target.files[0]));
+
+  // Drag & drop
+  dropzone?.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+  dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+  dropzone?.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+    handleFile(e.dataTransfer.files[0]);
+  });
+
+  let _parsedRows = [];
+
+  function handleFile(file) {
+    if (!file) return;
+    document.getElementById('import-filename').textContent = file.name;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const wb = window.XLSX.read(e.target.result, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const { rows, errors } = parseSheetRows(sheet);
+
+      if (errors.length) {
+        toast(errors[0], 'error');
+        return;
+      }
+
+      _parsedRows = rows;
+      showPreview(rows);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function showPreview(rows) {
+    const uniqueProducts = [...new Set(rows.map(r => r.code))].length;
+    const summary = document.getElementById('import-summary');
+    summary.innerHTML = `
+      <div class="import-summary-box">
+        <span><i class="fas fa-boxes"></i> <strong>${uniqueProducts}</strong> productos</span>
+        <span><i class="fas fa-layer-group"></i> <strong>${rows.length}</strong> variantes</span>
+        <span><i class="fas fa-palette"></i> <strong>${[...new Set(rows.map(r => r.color))].length}</strong> colores distintos</span>
+      </div>`;
+
+    const previewTable = document.getElementById('import-preview-table');
+    previewTable.innerHTML = `
+      <table class="table table-sm table-bordered">
+        <thead><tr><th>Código</th><th>Descripción</th><th>Marca</th><th>Proveedor</th><th>Temporada</th><th>Color</th><th>Talla</th><th>P.Venta</th><th>P.Costo</th></tr></thead>
+        <tbody>
+          ${rows.slice(0, 50).map(r => `<tr>
+            <td>${esc(r.code)}</td><td>${esc(r.description)}</td><td>${esc(r.brand)}</td>
+            <td>${esc(r.provider_name)}</td><td>${esc(r.season)}</td><td>${esc(r.color)}</td>
+            <td>${esc(r.size)}</td><td>$${r.sale_price.toFixed(2)}</td><td>$${r.cost_price.toFixed(2)}</td>
+          </tr>`).join('')}
+          ${rows.length > 50 ? `<tr><td colspan="9" class="text-center text-muted">… y ${rows.length - 50} filas más</td></tr>` : ''}
+        </tbody>
+      </table>`;
+
+    dropzone.classList.add('hidden');
+    document.getElementById('import-preview').classList.remove('hidden');
+  }
+
+  document.getElementById('btn-confirm-import')?.addEventListener('click', async () => {
+    if (!_parsedRows.length) return;
+    const btn = document.getElementById('btn-confirm-import');
+    setLoading(btn, true);
+    try {
+      const result = await executeImport(_parsedRows);
+      toast(`Importación completa: ${result.created} nuevos, ${result.updated} actualizados${result.errors > 0 ? `, ${result.errors} con errores` : ''}`, result.errors > 0 ? 'warning' : 'success', 5000);
+      closeModal();
+      reloadFn();
+    } catch (err) {
+      toast('Error durante importación: ' + err.message, 'error');
+    } finally {
+      setLoading(btn, false);
+    }
+  });
+}
+
+async function executeImport(rows) {
+  let created = 0, updated = 0, errors = 0;
+
+  // 1. Resolve/create providers in batch
+  const providerNames = [...new Set(rows.map(r => r.provider_name).filter(Boolean))];
+  const providerMap = {};
+  if (providerNames.length) {
+    const { data: existingProvs } = await db.from('providers').select('id, name').in('name', providerNames);
+    existingProvs?.forEach(p => { providerMap[p.name] = p.id; });
+    for (const name of providerNames) {
+      if (!providerMap[name]) {
+        const { data } = await db.from('providers').insert({ name }).select('id').single();
+        if (data) providerMap[name] = data.id;
+      }
+    }
+  }
+
+  // 2. Group rows by product code
+  const groups = {};
+  rows.forEach(r => {
+    if (!groups[r.code]) groups[r.code] = { info: r, variants: [] };
+    groups[r.code].variants.push({ color: r.color, size: r.size, sale_price: r.sale_price, cost_price: r.cost_price });
+  });
+
+  // 3. Check which codes already exist
+  const codes = Object.keys(groups);
+  const { data: existing } = await db.from('products').select('id, code').in('code', codes);
+  const existingMap = Object.fromEntries((existing || []).map(p => [p.code, p.id]));
+
+  // 4. Process each product
+  for (const [code, { info, variants }] of Object.entries(groups)) {
+    try {
+      const payload = {
+        code,
+        description: info.description,
+        brand:       info.brand || null,
+        provider_id: info.provider_name ? (providerMap[info.provider_name] || null) : null,
+        season:      info.season || null,
+        active:      true,
+        updated_at:  new Date().toISOString()
+      };
+
+      let productId = existingMap[code];
+
+      if (productId) {
+        await db.from('products').update(payload).eq('id', productId);
+        updated++;
+      } else {
+        const { data, error } = await db.from('products').insert(payload).select('id').single();
+        if (error) throw error;
+        productId = data.id;
+        created++;
+      }
+
+      // Upsert variants
+      const variantPayloads = variants.map(v => ({ product_id: productId, ...v }));
+      await db.from('product_variants').upsert(variantPayloads, { onConflict: 'product_id,color,size', ignoreDuplicates: false });
+    } catch {
+      errors++;
+    }
+  }
+
+  return { created, updated, errors };
+}
+
+export function downloadTemplate() {
+  const data = [
+    ['Codigo', 'Descripcion', 'Marca', 'Proveedor', 'Temporada', 'Color', 'Talla', 'PrecioVenta', 'PrecioCosto'],
+    ['CAM001', 'Camiseta Básica', 'Nike', 'Textilera ABC', 'Verano 2026', 'Rojo',  'S',  10.00, 6.00],
+    ['CAM001', 'Camiseta Básica', 'Nike', 'Textilera ABC', 'Verano 2026', 'Rojo',  'M',  11.00, 6.00],
+    ['CAM001', 'Camiseta Básica', 'Nike', 'Textilera ABC', 'Verano 2026', 'Rojo',  'L',  12.00, 6.50],
+    ['CAM001', 'Camiseta Básica', 'Nike', 'Textilera ABC', 'Verano 2026', 'Azul',  'S',  10.00, 6.00],
+    ['CAM001', 'Camiseta Básica', 'Nike', 'Textilera ABC', 'Verano 2026', 'Azul',  'M',  11.00, 6.00],
+    ['PAN002', 'Pantalón Sport',  'Adidas', 'Textilera ABC', 'Verano 2026', 'Negro', '28', 25.00, 15.00],
+    ['PAN002', 'Pantalón Sport',  'Adidas', 'Textilera ABC', 'Verano 2026', 'Negro', '30', 25.00, 15.00],
+    ['PAN002', 'Pantalón Sport',  'Adidas', 'Textilera ABC', 'Verano 2026', 'Gris',  '28', 25.00, 15.00],
+  ];
+  const ws = window.XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [14,20,12,16,14,10,8,12,12].map(w => ({ wch: w }));
+  const wb = window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+  window.XLSX.writeFile(wb, 'plantilla-productos.xlsx');
 }

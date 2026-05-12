@@ -1,7 +1,7 @@
 import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
-import { canSeeCost, canEditProducts, canDeleteProducts } from '../auth.js';
+import { canSeeCost, canEditProducts, canDeleteProducts, canExportExcel } from '../auth.js';
 
 let _all = [];
 
@@ -9,6 +9,7 @@ export async function renderProducts(container) {
   const _canEdit   = canEditProducts();
   const _canDelete = canDeleteProducts();
   const _canCost   = canSeeCost();
+  const _canXls    = canExportExcel();
 
   container.innerHTML = `
     <div class="card">
@@ -19,7 +20,7 @@ export async function renderProducts(container) {
             <input type="text" id="q-prod" placeholder="Buscar por código o descripción…" class="form-control">
           </div>
           <button class="btn btn-sm btn-outline" onclick="window._pr.pdf()"><i class="fas fa-file-pdf"></i> PDF</button>
-          <button class="btn btn-sm btn-outline" onclick="window._pr.xls()"><i class="fas fa-file-excel"></i> Excel</button>
+          ${_canXls ? `<button class="btn btn-sm btn-outline" onclick="window._pr.xls()"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
           ${_canEdit ? `<button class="btn btn-sm btn-outline" onclick="window._pr.importExcel()"><i class="fas fa-file-upload"></i> Importar Excel</button>` : ''}
           ${_canEdit ? `<button class="btn btn-accent" onclick="window._pr.form()"><i class="fas fa-plus"></i> Nuevo Producto</button>` : ''}
         </div>

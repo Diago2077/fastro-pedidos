@@ -1,6 +1,7 @@
 import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
+import { canExportExcel } from '../auth.js';
 
 let _all = [];
 
@@ -14,7 +15,7 @@ export async function renderProviders(container) {
             <input type="text" id="q-prov" placeholder="Buscar proveedor…" class="form-control">
           </div>
           <button class="btn btn-sm btn-outline" onclick="window._pv.pdf()"><i class="fas fa-file-pdf"></i> PDF</button>
-          <button class="btn btn-sm btn-outline" onclick="window._pv.xls()"><i class="fas fa-file-excel"></i> Excel</button>
+          ${canExportExcel() ? `<button class="btn btn-sm btn-outline" onclick="window._pv.xls()"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
           <button class="btn btn-accent" onclick="window._pv.form()"><i class="fas fa-plus"></i> Nuevo</button>
         </div>
       </div>

@@ -95,6 +95,14 @@ export async function renderUsers(container) {
               <small>Puede eliminar productos del catálogo</small>
             </span>
           </label>
+          <label class="perm-toggle">
+            <input type="checkbox" name="can_export_excel" ${u.can_export_excel ? 'checked' : ''}>
+            <span class="perm-label">
+              <i class="fas fa-file-excel"></i>
+              <strong>Exportar Excel</strong>
+              <small>Puede descargar reportes y listas en formato Excel</small>
+            </span>
+          </label>
         </div>
       </div>
 
@@ -131,6 +139,7 @@ export async function renderUsers(container) {
           can_see_cost:        role === 'admin' ? true : fd.has('can_see_cost'),
           can_edit_products:   role === 'admin' ? true : fd.has('can_edit_products'),
           can_delete_products: role === 'admin' ? true : fd.has('can_delete_products'),
+          can_export_excel:    role === 'admin' ? true : fd.has('can_export_excel'),
           updated_at: new Date().toISOString()
         };
         if (pwd) payload.password_hash = await hashPwd(pwd);

@@ -1,7 +1,7 @@
 import { db } from '../supabase.js';
 import { fCurrency, fNum } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
-import { canSeeCost } from '../auth.js';
+import { canSeeCost, canExportExcel } from '../auth.js';
 
 const charts = {};
 function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
@@ -52,6 +52,7 @@ async function loadReport(type) {
 // ---- BY SEASON ----
 function renderSeasonReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
   const showCost = canSeeCost();
+  const showXls  = canExportExcel();
   const map = {};
   orders.forEach(o => {
     const s = o.season || 'Sin temporada';
@@ -77,7 +78,7 @@ function renderSeasonReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
         <h5 class="card-title">Detalle por Temporada</h5>
         <div class="card-actions">
           <button class="btn btn-sm btn-outline" id="rpt-s-pdf"><i class="fas fa-file-pdf"></i> PDF</button>
-          <button class="btn btn-sm btn-outline" id="rpt-s-xls"><i class="fas fa-file-excel"></i> Excel</button>
+          ${showXls ? `<button class="btn btn-sm btn-outline" id="rpt-s-xls"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
         </div>
       </div>
       <div class="table-responsive">
@@ -135,6 +136,7 @@ function renderSeasonReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
 // ---- BY SELLER ----
 function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
   const showCost = canSeeCost();
+  const showXls  = canExportExcel();
   const map = {};
   orders.forEach(o => {
     const s = o.users?.name || 'Sin asignar';
@@ -160,7 +162,7 @@ function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
         <h5 class="card-title">Detalle por Vendedor</h5>
         <div class="card-actions">
           <button class="btn btn-sm btn-outline" id="rpt-v-pdf"><i class="fas fa-file-pdf"></i> PDF</button>
-          <button class="btn btn-sm btn-outline" id="rpt-v-xls"><i class="fas fa-file-excel"></i> Excel</button>
+          ${showXls ? `<button class="btn btn-sm btn-outline" id="rpt-v-xls"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
         </div>
       </div>
       <div class="table-responsive">

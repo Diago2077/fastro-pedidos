@@ -43,11 +43,16 @@ export function canDeleteProducts() {
   return s?.role === 'admin' || !!s?.can_delete_products;
 }
 
+export function canExportExcel() {
+  const s = getSession();
+  return s?.role === 'admin' || !!s?.can_export_excel;
+}
+
 export async function login(email, password) {
   const hash = await hashPwd(password);
   const { data, error } = await db
     .from('users')
-    .select('id, name, email, role, active, can_see_cost, can_edit_products, can_delete_products')
+    .select('id, name, email, role, active, can_see_cost, can_edit_products, can_delete_products, can_export_excel')
     .eq('email', email.toLowerCase().trim())
     .eq('password_hash', hash)
     .eq('active', true)

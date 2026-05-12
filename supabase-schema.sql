@@ -138,3 +138,11 @@ ALTER TABLE product_variants DISABLE ROW LEVEL SECURITY;
 ALTER TABLE orders          DISABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items     DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_config      DISABLE ROW LEVEL SECURITY;
+
+-- ============================================================
+-- MIGRACIONES (ejecutar solo una vez si la tabla ya existe)
+-- ============================================================
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_see_cost        BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_edit_products   BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_delete_products BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_export_excel    BOOLEAN DEFAULT false;

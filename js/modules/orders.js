@@ -1,7 +1,7 @@
 import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, fCurrency, fDate, statusBadge, esc } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
-import { getSession } from '../auth.js';
+import { getSession, canExportExcel } from '../auth.js';
 
 // In-memory state for order editing
 let _state = {
@@ -291,7 +291,7 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
     <div class="form-footer">
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
       <button type="button" class="btn btn-outline" id="btn-print-order"><i class="fas fa-file-pdf"></i> Imprimir</button>
-      <button type="button" class="btn btn-outline" id="btn-excel-order"><i class="fas fa-file-excel"></i> Excel</button>
+      ${canExportExcel() ? `<button type="button" class="btn btn-outline" id="btn-excel-order"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
       <button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar Pedido</button>
     </div>
   </form>`;

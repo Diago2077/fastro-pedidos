@@ -1,6 +1,7 @@
 import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
+import { canExportExcel } from '../auth.js';
 
 const COLS = [
   { key: 'name',       header: 'Nombre',   width: 20 },
@@ -23,7 +24,7 @@ export async function renderClients(container) {
             <input type="text" id="q-clients" placeholder="Buscar cliente…" class="form-control">
           </div>
           <button class="btn btn-sm btn-outline" onclick="window._cl.pdf()"><i class="fas fa-file-pdf"></i> PDF</button>
-          <button class="btn btn-sm btn-outline" onclick="window._cl.xls()"><i class="fas fa-file-excel"></i> Excel</button>
+          ${canExportExcel() ? `<button class="btn btn-sm btn-outline" onclick="window._cl.xls()"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
           <button class="btn btn-accent" onclick="window._cl.form()"><i class="fas fa-plus"></i> Nuevo</button>
         </div>
       </div>

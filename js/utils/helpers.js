@@ -50,7 +50,7 @@ export function fDateTime(d) {
 }
 
 export function fCurrency(n) {
-  return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n || 0);
+  return '₲ ' + new Intl.NumberFormat('es-PY', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(n || 0));
 }
 
 export function fNum(n) {

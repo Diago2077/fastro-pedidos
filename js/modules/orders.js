@@ -11,7 +11,7 @@ let _state = {
 let _allOrders = [];
 
 const STATUS_LABELS = { open: 'Abierto', sent: 'Enviado', closed: 'Cerrado' };
-function nextStatus(s) { return { open: 'sent', sent: 'closed', closed: 'open' }[s] || 'open'; }
+function nextStatus(s) { return { open: 'closed', closed: 'sent', sent: 'open' }[s] || 'open'; }
 function todayISO() { return new Date().toISOString().split('T')[0]; }
 
 export async function renderOrders(container) {

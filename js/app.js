@@ -1,7 +1,7 @@
 // ============================================================
 // FASTRO S.A. — App Entry Point
 // ============================================================
-import { getSession, saveSession, clearSession, login, isAdmin,
+import { getSession, saveSession, clearSession, login, isAdmin, refreshSession,
   canViewDashboard, canViewOrders, canViewClients,
   canViewProducts, canViewProviders, canViewReports } from './auth.js';
 import { avatarInitials, closeModal, toast } from './utils/helpers.js';
@@ -31,10 +31,16 @@ let currentSection = 'dashboard';
 // ============================================================
 // BOOT
 // ============================================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const session = getSession();
   if (session) {
-    showApp(session);
+    const fresh = await refreshSession();
+    if (fresh) {
+      showApp(fresh);
+    } else {
+      clearSession();
+      showLogin();
+    }
   } else {
     showLogin();
   }

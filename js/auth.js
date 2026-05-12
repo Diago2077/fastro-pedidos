@@ -96,13 +96,16 @@ export async function login(email, password) {
 export async function refreshSession() {
   const session = getSession();
   if (!session?.id) return null;
-  const { data } = await db
+  const { data, error } = await db
     .from('users')
     .select(USER_SELECT)
     .eq('id', session.id)
     .eq('active', true)
     .maybeSingle();
-  if (!data) return null;
+  if (error || !data) {
+    // Columns may not exist yet (pending migration) — keep existing session
+    return session;
+  }
   const remember = !!localStorage.getItem('fastro_user');
   saveSession(data, remember);
   return data;

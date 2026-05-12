@@ -102,8 +102,7 @@ function showApp(user) {
     const section = link.dataset.section;
     const check = sections[section]?.permCheck;
     const allowed = !check || check();
-    const li = link.closest('li') || link.parentElement;
-    li.style.display = allowed ? '' : 'none';
+    link.style.display = allowed ? '' : 'none';
   });
 
   // Sidebar navigation

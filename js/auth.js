@@ -57,6 +57,7 @@ export function canDeleteClients()   { return perm('can_delete_clients'); }
 
 // ---- productos ----
 export function canViewProducts()    { return perm('can_view_products',   true); }
+export function canCreateProducts()  { return perm('can_create_products'); }
 export function canEditProducts()    { return perm('can_edit_products'); }
 export function canDeleteProducts()  { return perm('can_delete_products'); }
 
@@ -74,7 +75,7 @@ const USER_SELECT = `id, name, email, role, active,
   can_view_dashboard,
   can_view_orders, can_create_orders, can_edit_orders, can_delete_orders,
   can_view_clients, can_create_clients, can_edit_clients, can_delete_clients,
-  can_view_products, can_edit_products, can_delete_products,
+  can_view_products, can_create_products, can_edit_products, can_delete_products,
   can_view_providers, can_create_providers, can_edit_providers, can_delete_providers,
   can_view_reports`;
 

@@ -95,10 +95,10 @@ export async function renderUsers(container) {
           </div>
           <div class="perms-row">
             <span><i class="fas fa-box-open"></i> Productos</span>
-            <span><input type="checkbox" name="can_view_products"   ${(u.can_view_products ?? true) ? 'checked' : ''}></span>
-            <span title="Crear y editar productos"><input type="checkbox" name="can_edit_products"   ${u.can_edit_products   ? 'checked' : ''}></span>
-            <span class="perm-na" title="Incluido en Crear">—</span>
-            <span><input type="checkbox" name="can_delete_products" ${u.can_delete_products ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_view_products"    ${(u.can_view_products    ?? true)  ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_create_products"  ${(u.can_create_products  ?? false) ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_edit_products"    ${(u.can_edit_products    ?? false) ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_delete_products"  ${(u.can_delete_products  ?? false) ? 'checked' : ''}></span>
           </div>
           <div class="perms-row">
             <span><i class="fas fa-truck"></i> Proveedores</span>
@@ -182,6 +182,7 @@ export async function renderUsers(container) {
           can_delete_clients:     role === 'admin' ? true : fd.has('can_delete_clients'),
           // productos
           can_view_products:      role === 'admin' ? true : fd.has('can_view_products'),
+          can_create_products:    role === 'admin' ? true : fd.has('can_create_products'),
           can_edit_products:      role === 'admin' ? true : fd.has('can_edit_products'),
           can_delete_products:    role === 'admin' ? true : fd.has('can_delete_products'),
           // proveedores

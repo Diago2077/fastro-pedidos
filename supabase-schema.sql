@@ -159,6 +159,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS can_edit_clients      BOOLEAN DEFAULT
 ALTER TABLE users ADD COLUMN IF NOT EXISTS can_delete_clients    BOOLEAN DEFAULT false;
 -- Productos
 ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_products     BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_create_products   BOOLEAN DEFAULT false;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS can_edit_products     BOOLEAN DEFAULT false;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS can_delete_products   BOOLEAN DEFAULT false;
 -- Proveedores

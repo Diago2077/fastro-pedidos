@@ -1,7 +1,7 @@
 import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, fCurrency, fDate, statusBadge, esc } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
-import { getSession, canExportExcel } from '../auth.js';
+import { getSession, canExportExcel, canCreateOrders, canEditOrders, canDeleteOrders } from '../auth.js';
 
 // In-memory state for order editing
 let _state = {
@@ -25,7 +25,7 @@ export async function renderOrders(container) {
             <option value="closed">Cerrados</option>
             <option value="sent">Enviados</option>
           </select>
-          <button class="btn btn-accent" onclick="window._ord.new()"><i class="fas fa-plus"></i> Nuevo Pedido</button>
+          ${canCreateOrders() ? `<button class="btn btn-accent" onclick="window._ord.new()"><i class="fas fa-plus"></i> Nuevo Pedido</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="ord-tbl"></div>
@@ -70,7 +70,7 @@ export async function renderOrders(container) {
             <td>${fDate(o.created_at)}</td>
             <td class="td-actions">
               <button class="btn btn-xs btn-outline" title="Ver / Editar" onclick="window._ord.open('${o.id}')"><i class="fas fa-eye"></i></button>
-              <button class="btn btn-xs btn-danger-outline" title="Eliminar" onclick="window._ord.del('${o.id}')"><i class="fas fa-trash"></i></button>
+              ${canDeleteOrders() ? `<button class="btn btn-xs btn-danger-outline" title="Eliminar" onclick="window._ord.del('${o.id}')"><i class="fas fa-trash"></i></button>` : ''}
             </td>
           </tr>`;
         }).join('')}
@@ -292,7 +292,7 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
       <button type="button" class="btn btn-outline" id="btn-print-order"><i class="fas fa-file-pdf"></i> Imprimir</button>
       ${canExportExcel() ? `<button type="button" class="btn btn-outline" id="btn-excel-order"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
-      <button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar Pedido</button>
+      ${(orderId ? canEditOrders() : canCreateOrders()) ? `<button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar Pedido</button>` : ''}
     </div>
   </form>`;
 }

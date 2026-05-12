@@ -776,6 +776,41 @@ select.form-control { cursor: pointer; }
 .import-summary-box span { display: flex; align-items: center; gap: 6px; }
 .import-summary-box i { color: var(--success); }
 
+/* Permission table (module × action grid) */
+.perms-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  font-size: .875rem;
+}
+.perms-head, .perms-row {
+  display: grid;
+  grid-template-columns: 1fr repeat(4, 56px);
+  align-items: center;
+}
+.perms-head {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.perms-head span, .perms-row span {
+  padding: 8px 10px;
+  text-align: center;
+}
+.perms-head span:first-child, .perms-row span:first-child {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.perms-row { border-top: 1px solid var(--border); }
+.perms-row:hover { background: var(--bg-secondary); }
+.perms-row input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+.perms-row span i { color: var(--accent); margin-right: 5px; }
+.perm-na { color: var(--text-muted); font-size: 1rem; }
+
 /* Permission toggles */
 .perms-grid {
   display: grid;

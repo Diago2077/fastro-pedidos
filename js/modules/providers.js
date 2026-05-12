@@ -1,7 +1,7 @@
 import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
-import { canExportExcel } from '../auth.js';
+import { canExportExcel, canCreateProviders, canEditProviders, canDeleteProviders } from '../auth.js';
 
 let _all = [];
 
@@ -16,7 +16,7 @@ export async function renderProviders(container) {
           </div>
           <button class="btn btn-sm btn-outline" onclick="window._pv.pdf()"><i class="fas fa-file-pdf"></i> PDF</button>
           ${canExportExcel() ? `<button class="btn btn-sm btn-outline" onclick="window._pv.xls()"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
-          <button class="btn btn-accent" onclick="window._pv.form()"><i class="fas fa-plus"></i> Nuevo</button>
+          ${canCreateProviders() ? `<button class="btn btn-accent" onclick="window._pv.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="pv-tbl"></div>
@@ -42,8 +42,8 @@ export async function renderProviders(container) {
           <td><strong>${esc(p.name)}</strong></td>
           <td>${new Date(p.created_at).toLocaleDateString('es-EC')}</td>
           <td class="td-actions">
-            <button class="btn btn-xs btn-outline" onclick="window._pv.form('${p.id}')"><i class="fas fa-edit"></i></button>
-            <button class="btn btn-xs btn-danger-outline" onclick="window._pv.del('${p.id}')"><i class="fas fa-trash"></i></button>
+            ${canEditProviders()   ? `<button class="btn btn-xs btn-outline" onclick="window._pv.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
+            ${canDeleteProviders() ? `<button class="btn btn-xs btn-danger-outline" onclick="window._pv.del('${p.id}')"><i class="fas fa-trash"></i></button>` : ''}
           </td>
         </tr>`).join('')}
       </tbody>

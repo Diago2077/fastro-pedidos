@@ -1,7 +1,9 @@
 // ============================================================
 // FASTRO S.A. — App Entry Point
 // ============================================================
-import { getSession, saveSession, clearSession, login, isAdmin } from './auth.js';
+import { getSession, saveSession, clearSession, login, isAdmin,
+  canViewDashboard, canViewOrders, canViewClients,
+  canViewProducts, canViewProviders, canViewReports } from './auth.js';
 import { avatarInitials, closeModal, toast } from './utils/helpers.js';
 import { renderDashboard }  from './modules/dashboard.js';
 import { renderClients }    from './modules/clients.js';
@@ -14,14 +16,14 @@ import { renderSettings }   from './modules/settings.js';
 
 // ---- Section registry ----
 const sections = {
-  dashboard: { title: 'Dashboard',      render: renderDashboard,  adminOnly: false },
-  orders:    { title: 'Pedidos',         render: renderOrders,     adminOnly: false },
-  clients:   { title: 'Clientes',        render: renderClients,    adminOnly: true  },
-  products:  { title: 'Productos',       render: renderProducts,   adminOnly: false },
-  providers: { title: 'Proveedores',     render: renderProviders,  adminOnly: false },
-  reports:   { title: 'Reportes',        render: renderReports,    adminOnly: false },
-  users:     { title: 'Usuarios',        render: renderUsers,      adminOnly: true  },
-  settings:  { title: 'Configuración',   render: renderSettings,   adminOnly: true  }
+  dashboard: { title: 'Dashboard',      render: renderDashboard,  permCheck: canViewDashboard },
+  orders:    { title: 'Pedidos',         render: renderOrders,     permCheck: canViewOrders    },
+  clients:   { title: 'Clientes',        render: renderClients,    permCheck: canViewClients   },
+  products:  { title: 'Productos',       render: renderProducts,   permCheck: canViewProducts  },
+  providers: { title: 'Proveedores',     render: renderProviders,  permCheck: canViewProviders },
+  reports:   { title: 'Reportes',        render: renderReports,    permCheck: canViewReports   },
+  users:     { title: 'Usuarios',        render: renderUsers,      permCheck: isAdmin          },
+  settings:  { title: 'Configuración',   render: renderSettings,   permCheck: isAdmin          }
 };
 
 let currentSection = 'dashboard';
@@ -89,9 +91,13 @@ function showApp(user) {
   document.getElementById('sidebar-user-name').textContent = user.name;
   document.getElementById('sidebar-user-role').textContent = user.role === 'admin' ? 'Administrador' : 'Usuario';
 
-  // Show/hide admin-only nav items
-  document.querySelectorAll('.admin-only').forEach(el => {
-    el.style.display = isAdmin() ? 'flex' : 'none';
+  // Show/hide nav items based on permissions
+  document.querySelectorAll('.nav-link[data-section]').forEach(link => {
+    const section = link.dataset.section;
+    const check = sections[section]?.permCheck;
+    const allowed = !check || check();
+    const li = link.closest('li') || link.parentElement;
+    li.style.display = allowed ? '' : 'none';
   });
 
   // Sidebar navigation
@@ -99,7 +105,8 @@ function showApp(user) {
     link.addEventListener('click', e => {
       e.preventDefault();
       const section = link.dataset.section;
-      if (sections[section]?.adminOnly && !isAdmin()) { toast('Acceso restringido', 'warning'); return; }
+      const check = sections[section]?.permCheck;
+      if (check && !check()) { toast('Acceso restringido', 'warning'); return; }
       navigate(section);
       closeSidebarMobile();
     });
@@ -122,13 +129,25 @@ function showApp(user) {
   // Global closeModal
   window.closeModal = closeModal;
 
-  // Initial section
+  // Initial section — fall back to first accessible if hash is restricted
   const hash = window.location.hash.replace('#', '') || 'dashboard';
-  navigate(sections[hash] ? hash : 'dashboard');
+  const target = sections[hash] ? hash : 'dashboard';
+  const check = sections[target]?.permCheck;
+  if (check && !check()) {
+    const fallback = Object.keys(sections).find(k => !sections[k].permCheck || sections[k].permCheck());
+    navigate(fallback || 'dashboard');
+  } else {
+    navigate(target);
+  }
 }
 
 function navigate(section) {
   if (!sections[section]) return;
+  const check = sections[section]?.permCheck;
+  if (check && !check()) {
+    toast('Acceso restringido', 'warning');
+    return;
+  }
   currentSection = section;
 
   // Update URL hash (no scroll)

@@ -67,32 +67,61 @@ export async function renderUsers(container) {
         </select>
       </div>
 
-      <!-- Permisos adicionales — solo visibles para rol Usuario -->
+      <!-- Permisos por módulo — solo visibles para rol Usuario -->
       <div class="form-group span-2" id="perms-section" ${isUserRole ? '' : 'style="display:none"'}>
-        <label class="form-label">Permisos adicionales</label>
+        <label class="form-label">Permisos por módulo</label>
+        <div class="perms-table">
+          <div class="perms-head">
+            <span>Módulo</span><span>Ver</span><span>Crear</span><span>Editar</span><span>Borrar</span>
+          </div>
+          <div class="perms-row">
+            <span><i class="fas fa-tachometer-alt"></i> Dashboard</span>
+            <span><input type="checkbox" name="can_view_dashboard" ${(u.can_view_dashboard ?? true) ? 'checked' : ''}></span>
+            <span class="perm-na">—</span><span class="perm-na">—</span><span class="perm-na">—</span>
+          </div>
+          <div class="perms-row">
+            <span><i class="fas fa-file-invoice"></i> Pedidos</span>
+            <span><input type="checkbox" name="can_view_orders"   ${(u.can_view_orders   ?? true) ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_create_orders" ${(u.can_create_orders ?? true) ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_edit_orders"   ${(u.can_edit_orders   ?? true) ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_delete_orders" ${(u.can_delete_orders ?? true) ? 'checked' : ''}></span>
+          </div>
+          <div class="perms-row">
+            <span><i class="fas fa-users"></i> Clientes</span>
+            <span><input type="checkbox" name="can_view_clients"   ${(u.can_view_clients   ?? false) ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_create_clients" ${(u.can_create_clients ?? false) ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_edit_clients"   ${(u.can_edit_clients   ?? false) ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_delete_clients" ${(u.can_delete_clients ?? false) ? 'checked' : ''}></span>
+          </div>
+          <div class="perms-row">
+            <span><i class="fas fa-box-open"></i> Productos</span>
+            <span><input type="checkbox" name="can_view_products"   ${(u.can_view_products ?? true) ? 'checked' : ''}></span>
+            <span title="Crear y editar productos"><input type="checkbox" name="can_edit_products"   ${u.can_edit_products   ? 'checked' : ''}></span>
+            <span class="perm-na" title="Incluido en Crear">—</span>
+            <span><input type="checkbox" name="can_delete_products" ${u.can_delete_products ? 'checked' : ''}></span>
+          </div>
+          <div class="perms-row">
+            <span><i class="fas fa-truck"></i> Proveedores</span>
+            <span><input type="checkbox" name="can_view_providers"    ${(u.can_view_providers    ?? true) ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_create_providers"  ${(u.can_create_providers  ?? true) ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_edit_providers"    ${(u.can_edit_providers    ?? true) ? 'checked' : ''}></span>
+            <span><input type="checkbox" name="can_delete_providers"  ${(u.can_delete_providers  ?? true) ? 'checked' : ''}></span>
+          </div>
+          <div class="perms-row">
+            <span><i class="fas fa-chart-bar"></i> Reportes</span>
+            <span><input type="checkbox" name="can_view_reports" ${(u.can_view_reports ?? true) ? 'checked' : ''}></span>
+            <span class="perm-na">—</span><span class="perm-na">—</span><span class="perm-na">—</span>
+          </div>
+        </div>
+
+        <label class="form-label mt-3">Permisos adicionales</label>
         <div class="perms-grid">
           <label class="perm-toggle">
             <input type="checkbox" name="can_see_cost" ${u.can_see_cost ? 'checked' : ''}>
             <span class="perm-label">
               <i class="fas fa-eye"></i>
               <strong>Ver precio de costo</strong>
-              <small>Puede ver precios de costo en productos y reportes</small>
-            </span>
-          </label>
-          <label class="perm-toggle">
-            <input type="checkbox" name="can_edit_products" ${u.can_edit_products ? 'checked' : ''}>
-            <span class="perm-label">
-              <i class="fas fa-edit"></i>
-              <strong>Crear / Editar productos</strong>
-              <small>Puede agregar y modificar productos y variantes</small>
-            </span>
-          </label>
-          <label class="perm-toggle">
-            <input type="checkbox" name="can_delete_products" ${u.can_delete_products ? 'checked' : ''}>
-            <span class="perm-label">
-              <i class="fas fa-trash"></i>
-              <strong>Eliminar productos</strong>
-              <small>Puede eliminar productos del catálogo</small>
+              <small>Productos y reportes</small>
             </span>
           </label>
           <label class="perm-toggle">
@@ -100,7 +129,7 @@ export async function renderUsers(container) {
             <span class="perm-label">
               <i class="fas fa-file-excel"></i>
               <strong>Exportar Excel</strong>
-              <small>Puede descargar reportes y listas en formato Excel</small>
+              <small>En todas las secciones</small>
             </span>
           </label>
         </div>
@@ -136,10 +165,32 @@ export async function renderUsers(container) {
           name: fd.get('name'),
           role,
           // permissions: always save; admins get true by default via canXxx() helpers
-          can_see_cost:        role === 'admin' ? true : fd.has('can_see_cost'),
-          can_edit_products:   role === 'admin' ? true : fd.has('can_edit_products'),
-          can_delete_products: role === 'admin' ? true : fd.has('can_delete_products'),
-          can_export_excel:    role === 'admin' ? true : fd.has('can_export_excel'),
+          // general
+          can_see_cost:           role === 'admin' ? true : fd.has('can_see_cost'),
+          can_export_excel:       role === 'admin' ? true : fd.has('can_export_excel'),
+          // dashboard
+          can_view_dashboard:     role === 'admin' ? true : fd.has('can_view_dashboard'),
+          // pedidos
+          can_view_orders:        role === 'admin' ? true : fd.has('can_view_orders'),
+          can_create_orders:      role === 'admin' ? true : fd.has('can_create_orders'),
+          can_edit_orders:        role === 'admin' ? true : fd.has('can_edit_orders'),
+          can_delete_orders:      role === 'admin' ? true : fd.has('can_delete_orders'),
+          // clientes
+          can_view_clients:       role === 'admin' ? true : fd.has('can_view_clients'),
+          can_create_clients:     role === 'admin' ? true : fd.has('can_create_clients'),
+          can_edit_clients:       role === 'admin' ? true : fd.has('can_edit_clients'),
+          can_delete_clients:     role === 'admin' ? true : fd.has('can_delete_clients'),
+          // productos
+          can_view_products:      role === 'admin' ? true : fd.has('can_view_products'),
+          can_edit_products:      role === 'admin' ? true : fd.has('can_edit_products'),
+          can_delete_products:    role === 'admin' ? true : fd.has('can_delete_products'),
+          // proveedores
+          can_view_providers:     role === 'admin' ? true : fd.has('can_view_providers'),
+          can_create_providers:   role === 'admin' ? true : fd.has('can_create_providers'),
+          can_edit_providers:     role === 'admin' ? true : fd.has('can_edit_providers'),
+          can_delete_providers:   role === 'admin' ? true : fd.has('can_delete_providers'),
+          // reportes
+          can_view_reports:       role === 'admin' ? true : fd.has('can_view_reports'),
           updated_at: new Date().toISOString()
         };
         if (pwd) payload.password_hash = await hashPwd(pwd);

@@ -1,7 +1,7 @@
 import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
-import { canExportExcel } from '../auth.js';
+import { canExportExcel, canCreateClients, canEditClients, canDeleteClients } from '../auth.js';
 
 const COLS = [
   { key: 'name',       header: 'Nombre',   width: 20 },
@@ -25,7 +25,7 @@ export async function renderClients(container) {
           </div>
           <button class="btn btn-sm btn-outline" onclick="window._cl.pdf()"><i class="fas fa-file-pdf"></i> PDF</button>
           ${canExportExcel() ? `<button class="btn btn-sm btn-outline" onclick="window._cl.xls()"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
-          <button class="btn btn-accent" onclick="window._cl.form()"><i class="fas fa-plus"></i> Nuevo</button>
+          ${canCreateClients() ? `<button class="btn btn-accent" onclick="window._cl.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="cl-tbl"></div>
@@ -55,8 +55,8 @@ export async function renderClients(container) {
           <td>${esc(c.city || '–')}</td>
           <td>${esc(c.email || '–')}</td>
           <td class="td-actions">
-            <button class="btn btn-xs btn-outline" onclick="window._cl.form('${c.id}')"><i class="fas fa-edit"></i></button>
-            <button class="btn btn-xs btn-danger-outline" onclick="window._cl.del('${c.id}')"><i class="fas fa-trash"></i></button>
+            ${canEditClients()   ? `<button class="btn btn-xs btn-outline" onclick="window._cl.form('${c.id}')"><i class="fas fa-edit"></i></button>` : ''}
+            ${canDeleteClients() ? `<button class="btn btn-xs btn-danger-outline" onclick="window._cl.del('${c.id}')"><i class="fas fa-trash"></i></button>` : ''}
           </td>
         </tr>`).join('')}
       </tbody>

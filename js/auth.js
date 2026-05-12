@@ -28,31 +28,59 @@ export function isAdmin() {
   return getSession()?.role === 'admin';
 }
 
-export function canSeeCost() {
+// ---- helpers internos ----
+function perm(col, defaultVal = false) {
   const s = getSession();
-  return s?.role === 'admin' || !!s?.can_see_cost;
+  if (!s) return false;
+  if (s.role === 'admin') return true;
+  return s[col] ?? defaultVal;
 }
 
-export function canEditProducts() {
-  const s = getSession();
-  return s?.role === 'admin' || !!s?.can_edit_products;
-}
+// ---- permisos generales ----
+export function canSeeCost()      { return perm('can_see_cost'); }
+export function canExportExcel()  { return perm('can_export_excel'); }
 
-export function canDeleteProducts() {
-  const s = getSession();
-  return s?.role === 'admin' || !!s?.can_delete_products;
-}
+// ---- dashboard ----
+export function canViewDashboard()   { return perm('can_view_dashboard', true); }
 
-export function canExportExcel() {
-  const s = getSession();
-  return s?.role === 'admin' || !!s?.can_export_excel;
-}
+// ---- pedidos ----
+export function canViewOrders()      { return perm('can_view_orders',   true); }
+export function canCreateOrders()    { return perm('can_create_orders', true); }
+export function canEditOrders()      { return perm('can_edit_orders',   true); }
+export function canDeleteOrders()    { return perm('can_delete_orders', true); }
+
+// ---- clientes ----
+export function canViewClients()     { return perm('can_view_clients');   }
+export function canCreateClients()   { return perm('can_create_clients'); }
+export function canEditClients()     { return perm('can_edit_clients');   }
+export function canDeleteClients()   { return perm('can_delete_clients'); }
+
+// ---- productos ----
+export function canViewProducts()    { return perm('can_view_products',   true); }
+export function canEditProducts()    { return perm('can_edit_products'); }
+export function canDeleteProducts()  { return perm('can_delete_products'); }
+
+// ---- proveedores ----
+export function canViewProviders()    { return perm('can_view_providers',    true); }
+export function canCreateProviders()  { return perm('can_create_providers',  true); }
+export function canEditProviders()    { return perm('can_edit_providers',    true); }
+export function canDeleteProviders()  { return perm('can_delete_providers',  true); }
+
+// ---- reportes ----
+export function canViewReports()     { return perm('can_view_reports', true); }
 
 export async function login(email, password) {
   const hash = await hashPwd(password);
   const { data, error } = await db
     .from('users')
-    .select('id, name, email, role, active, can_see_cost, can_edit_products, can_delete_products, can_export_excel')
+    .select(`id, name, email, role, active,
+      can_see_cost, can_export_excel,
+      can_view_dashboard,
+      can_view_orders, can_create_orders, can_edit_orders, can_delete_orders,
+      can_view_clients, can_create_clients, can_edit_clients, can_delete_clients,
+      can_view_products, can_edit_products, can_delete_products,
+      can_view_providers, can_create_providers, can_edit_providers, can_delete_providers,
+      can_view_reports`)
     .eq('email', email.toLowerCase().trim())
     .eq('password_hash', hash)
     .eq('active', true)

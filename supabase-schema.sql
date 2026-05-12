@@ -142,7 +142,29 @@ ALTER TABLE app_config      DISABLE ROW LEVEL SECURITY;
 -- ============================================================
 -- MIGRACIONES (ejecutar solo una vez si la tabla ya existe)
 -- ============================================================
-ALTER TABLE users ADD COLUMN IF NOT EXISTS can_see_cost        BOOLEAN DEFAULT false;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS can_edit_products   BOOLEAN DEFAULT false;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS can_delete_products BOOLEAN DEFAULT false;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS can_export_excel    BOOLEAN DEFAULT false;
+-- Permisos generales
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_see_cost          BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_export_excel      BOOLEAN DEFAULT false;
+-- Dashboard
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_dashboard    BOOLEAN DEFAULT true;
+-- Pedidos
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_orders       BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_create_orders     BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_edit_orders       BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_delete_orders     BOOLEAN DEFAULT true;
+-- Clientes (era admin-only, por eso default false)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_clients      BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_create_clients    BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_edit_clients      BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_delete_clients    BOOLEAN DEFAULT false;
+-- Productos
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_products     BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_edit_products     BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_delete_products   BOOLEAN DEFAULT false;
+-- Proveedores
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_providers    BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_create_providers  BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_edit_providers    BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_delete_providers  BOOLEAN DEFAULT true;
+-- Reportes
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_reports      BOOLEAN DEFAULT true;

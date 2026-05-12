@@ -152,7 +152,7 @@ async function openOrderModal(orderId, onSavedFn) {
     const q = e.target.value.trim();
     if (q.length < 2) { searchResults.classList.add('hidden'); return; }
     const { data } = await db.from('products')
-      .select('id, code, description, product_variants(id, color, size, sale_price, cost_price)')
+      .select('id, code, description, product_variants(id, color, size, sale_price, cost_price, created_at)')
       .eq('active', true)
       .or(`code.ilike.%${q}%,description.ilike.%${q}%`)
       .limit(10);
@@ -303,9 +303,13 @@ function showProductGrid(product) {
   const wrap = document.getElementById('product-grid-wrap');
   if (!wrap) return;
 
-  const variants  = product.product_variants || [];
-  const colors    = [...new Set(variants.map(v => v.color))].sort();
-  const sizes     = [...new Set(variants.map(v => v.size))].sort();
+  // Sort variants by creation order to preserve the order defined when the product was created
+  const variants = [...(product.product_variants || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  // Unique sizes and colors in creation order (no alphabetical sort)
+  const sizes  = [...new Map(variants.map(v => [v.size,  v])).keys()];
+  const colors = [...new Map(variants.map(v => [v.color, v])).keys()];
+
   const variantMap = {};
   variants.forEach(v => { variantMap[`${v.color}|||${v.size}`] = v; });
 

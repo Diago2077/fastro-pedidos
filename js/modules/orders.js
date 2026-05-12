@@ -516,9 +516,15 @@ async function saveOrder(originalOrder, orderId, onSavedFn) {
 // ============================================================
 // PDF / EXCEL EXPORT FOR AN ORDER
 // ============================================================
+
+// jsPDF default font (Helvetica) doesn't support ₲ — use "Gs." instead
+function fGs(n) {
+  return 'Gs. ' + new Intl.NumberFormat('es-PY', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(n || 0));
+}
+
 export async function exportOrderPDF(orderId) {
   const { data: order } = await db.from('orders')
-    .select('*, clients(*), users(name), providers(name)')
+    .select('*, clients(*), users(name)')
     .eq('id', orderId).single();
   const { data: items } = await db.from('order_items')
     .select('quantity, unit_sale_price, unit_cost_price, product_variants(color, size, products(code, description))')
@@ -526,8 +532,8 @@ export async function exportOrderPDF(orderId) {
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
-  const sub = (items || []).reduce((a, i) => a + i.quantity * i.unit_sale_price, 0);
-  const disc = sub * ((order.discount_pct || 0) / 100);
+  const sub   = (items || []).reduce((a, i) => a + i.quantity * i.unit_sale_price, 0);
+  const disc  = sub * ((order.discount_pct || 0) / 100);
   const total = sub - disc;
 
   // Header
@@ -539,36 +545,36 @@ export async function exportOrderPDF(orderId) {
   doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.text('PEDIDO DE COMPRA', 14, 19);
   doc.text(order.order_number, 196, 12, { align: 'right' });
-  doc.text(new Date(order.created_at).toLocaleDateString('es-EC'), 196, 19, { align: 'right' });
+  doc.text(new Date(order.created_at).toLocaleDateString('es-PY'), 196, 19, { align: 'right' });
 
-  // Info block
+  // Info block (2 columns, no proveedor)
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(9);
   const infoY = 30;
-  doc.text(`Cliente: ${order.clients?.name || '–'}`, 14, infoY);
-  doc.text(`RUC: ${order.clients?.ruc || '–'}`, 14, infoY + 5);
-  doc.text(`Proveedor: ${order.providers?.name || '–'}`, 14, infoY + 10);
-  doc.text(`Vendedor: ${order.users?.name || '–'}`, 110, infoY);
-  doc.text(`Temporada: ${order.season || '–'}`, 110, infoY + 5);
-  doc.text(`Envío: ${order.shipping_date ? fDate(order.shipping_date) : '–'}`, 110, infoY + 10);
+  doc.text(`Cliente:   ${order.clients?.name  || '–'}`, 14, infoY);
+  doc.text(`RUC:       ${order.clients?.ruc   || '–'}`, 14, infoY + 5);
+  doc.text(`Telefono:  ${order.clients?.phone || '–'}`, 14, infoY + 10);
+  doc.text(`Vendedor:  ${order.users?.name    || '–'}`, 110, infoY);
+  doc.text(`Temporada: ${order.season         || '–'}`, 110, infoY + 5);
+  doc.text(`Envio:     ${order.shipping_date  ? fDate(order.shipping_date) : '–'}`, 110, infoY + 10);
 
   doc.autoTable({
     startY: infoY + 18,
-    head: [['Código', 'Descripción', 'Color', 'Talla', 'Cant.', 'P.Venta', 'Subtotal']],
+    head: [['Codigo', 'Descripcion', 'Color', 'Talla', 'Cant.', 'P.Venta', 'Subtotal']],
     body: (items || []).map(i => [
-      i.product_variants?.products?.code || '–',
+      i.product_variants?.products?.code        || '–',
       i.product_variants?.products?.description || '–',
       i.product_variants?.color || '–',
       i.product_variants?.size  || '–',
       i.quantity,
-      fCurrency(i.unit_sale_price),
-      fCurrency(i.quantity * i.unit_sale_price)
+      fGs(i.unit_sale_price),
+      fGs(i.quantity * i.unit_sale_price)
     ]),
     headStyles: { fillColor: [155, 0, 0] },
     foot: [
-      ['', '', '', '', '', 'Subtotal', fCurrency(sub)],
-      ['', '', '', '', '', `Descuento (${order.discount_pct || 0}%)`, '-' + fCurrency(disc)],
-      ['', '', '', '', '', 'TOTAL', fCurrency(total)]
+      ['', '', '', '', '', 'Subtotal',                      fGs(sub)],
+      ['', '', '', '', '', `Descuento (${order.discount_pct || 0}%)`, '-' + fGs(disc)],
+      ['', '', '', '', '', 'TOTAL',                         fGs(total)]
     ],
     footStyles: { fontStyle: 'bold' },
     styles: { fontSize: 8 }
@@ -577,7 +583,7 @@ export async function exportOrderPDF(orderId) {
   if (order.observation) {
     const finalY = doc.lastAutoTable.finalY + 6;
     doc.setFontSize(8);
-    doc.text(`Observación: ${order.observation}`, 14, finalY);
+    doc.text(`Observacion: ${order.observation}`, 14, finalY);
   }
 
   doc.save(`${order.order_number}.pdf`);

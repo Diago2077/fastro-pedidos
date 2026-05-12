@@ -1,10 +1,15 @@
 import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
+import { canSeeCost, canEditProducts, canDeleteProducts } from '../auth.js';
 
 let _all = [];
 
 export async function renderProducts(container) {
+  const _canEdit   = canEditProducts();
+  const _canDelete = canDeleteProducts();
+  const _canCost   = canSeeCost();
+
   container.innerHTML = `
     <div class="card">
       <div class="card-header">
@@ -15,8 +20,8 @@ export async function renderProducts(container) {
           </div>
           <button class="btn btn-sm btn-outline" onclick="window._pr.pdf()"><i class="fas fa-file-pdf"></i> PDF</button>
           <button class="btn btn-sm btn-outline" onclick="window._pr.xls()"><i class="fas fa-file-excel"></i> Excel</button>
-          <button class="btn btn-sm btn-outline" onclick="window._pr.importExcel()"><i class="fas fa-file-upload"></i> Importar Excel</button>
-          <button class="btn btn-accent" onclick="window._pr.form()"><i class="fas fa-plus"></i> Nuevo Producto</button>
+          ${_canEdit ? `<button class="btn btn-sm btn-outline" onclick="window._pr.importExcel()"><i class="fas fa-file-upload"></i> Importar Excel</button>` : ''}
+          ${_canEdit ? `<button class="btn btn-accent" onclick="window._pr.form()"><i class="fas fa-plus"></i> Nuevo Producto</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="pr-tbl"></div>
@@ -50,8 +55,8 @@ export async function renderProducts(container) {
             <td><span class="text-muted small">${esc(colors || '–')}</span></td>
             <td><span class="text-muted small">${esc(sizes || '–')}</span></td>
             <td class="td-actions">
-              <button class="btn btn-xs btn-outline" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i></button>
-              <button class="btn btn-xs btn-danger-outline" onclick="window._pr.del('${p.id}')"><i class="fas fa-trash"></i></button>
+              ${_canEdit   ? `<button class="btn btn-xs btn-outline" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
+              ${_canDelete ? `<button class="btn btn-xs btn-danger-outline" onclick="window._pr.del('${p.id}')"><i class="fas fa-trash"></i></button>` : ''}
             </td>
           </tr>`;
         }).join('')}
@@ -117,6 +122,7 @@ export async function renderProducts(container) {
 }
 
 function buildProductFormHTML(p, provs, initSizes, initColors) {
+  const showCost = canSeeCost();
   const opts = provs.map(pv => `<option value="${pv.id}" ${p.provider_id === pv.id ? 'selected' : ''}>${esc(pv.name)}</option>`).join('');
   return `
   <form id="pr-form">
@@ -154,9 +160,9 @@ function buildProductFormHTML(p, provs, initSizes, initColors) {
       </div>
       <div class="sizes-table-wrap">
         <table class="table table-sm" id="sizes-table">
-          <thead><tr><th>Talla</th><th>Precio Venta</th><th>Precio Costo</th><th></th></tr></thead>
+          <thead><tr><th>Talla</th><th>Precio Venta</th>${showCost ? '<th>Precio Costo</th>' : ''}<th></th></tr></thead>
           <tbody id="sizes-tbody">
-            ${initSizes.map((s, i) => sizeRowHTML(i, s.size, s.sale_price, s.cost_price)).join('')}
+            ${initSizes.map((s, i) => sizeRowHTML(i, s.size, s.sale_price, s.cost_price, showCost)).join('')}
           </tbody>
         </table>
       </div>
@@ -183,11 +189,11 @@ function buildProductFormHTML(p, provs, initSizes, initColors) {
   </form>`;
 }
 
-function sizeRowHTML(idx, size = '', sale = '', cost = '') {
+function sizeRowHTML(idx, size = '', sale = '', cost = '', showCost = true) {
   return `<tr data-size-idx="${idx}">
     <td><input type="text" class="form-control form-control-sm sz-name" placeholder="Ej: M" value="${esc(size)}" required></td>
     <td><input type="number" step="0.01" min="0" class="form-control form-control-sm sz-sale" placeholder="0.00" value="${sale}"></td>
-    <td><input type="number" step="0.01" min="0" class="form-control form-control-sm sz-cost" placeholder="0.00" value="${cost}"></td>
+    ${showCost ? `<td><input type="number" step="0.01" min="0" class="form-control form-control-sm sz-cost" placeholder="0.00" value="${cost}"></td>` : `<td style="display:none"><input type="hidden" class="sz-cost" value="${cost}"></td>`}
     <td><button type="button" class="btn btn-xs btn-danger-outline btn-rm-size"><i class="fas fa-times"></i></button></td>
   </tr>`;
 }
@@ -214,7 +220,7 @@ function initProductForm(id, originalProduct, reloadFn) {
   let colorIdx = document.querySelectorAll('#colors-list .color-tag').length;
 
   document.getElementById('btn-add-size')?.addEventListener('click', () => {
-    document.getElementById('sizes-tbody').insertAdjacentHTML('beforeend', sizeRowHTML(sizeIdx++));
+    document.getElementById('sizes-tbody').insertAdjacentHTML('beforeend', sizeRowHTML(sizeIdx++, '', '', '', canSeeCost()));
     updateVariantPreview();
   });
 

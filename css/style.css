@@ -775,3 +775,27 @@ select.form-control { cursor: pointer; }
 }
 .import-summary-box span { display: flex; align-items: center; gap: 6px; }
 .import-summary-box i { color: var(--success); }
+
+/* Permission toggles */
+.perms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+.perm-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.perm-toggle:hover { border-color: var(--accent); background: var(--accent-light); }
+.perm-toggle input[type="checkbox"] { margin-top: 3px; accent-color: var(--accent); flex-shrink: 0; }
+.perm-label { display: flex; flex-direction: column; gap: 2px; }
+.perm-label i { color: var(--accent); margin-bottom: 2px; }
+.perm-label strong { font-size: .875rem; }
+.perm-label small { color: var(--text-muted); font-size: .78rem; }

@@ -28,11 +28,26 @@ export function isAdmin() {
   return getSession()?.role === 'admin';
 }
 
+export function canSeeCost() {
+  const s = getSession();
+  return s?.role === 'admin' || !!s?.can_see_cost;
+}
+
+export function canEditProducts() {
+  const s = getSession();
+  return s?.role === 'admin' || !!s?.can_edit_products;
+}
+
+export function canDeleteProducts() {
+  const s = getSession();
+  return s?.role === 'admin' || !!s?.can_delete_products;
+}
+
 export async function login(email, password) {
   const hash = await hashPwd(password);
   const { data, error } = await db
     .from('users')
-    .select('id, name, email, role, active')
+    .select('id, name, email, role, active, can_see_cost, can_edit_products, can_delete_products')
     .eq('email', email.toLowerCase().trim())
     .eq('password_hash', hash)
     .eq('active', true)

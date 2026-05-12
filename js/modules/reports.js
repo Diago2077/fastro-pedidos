@@ -1,6 +1,7 @@
 import { db } from '../supabase.js';
 import { fCurrency, fNum } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
+import { canSeeCost } from '../auth.js';
 
 const charts = {};
 function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
@@ -50,6 +51,7 @@ async function loadReport(type) {
 
 // ---- BY SEASON ----
 function renderSeasonReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
+  const showCost = canSeeCost();
   const map = {};
   orders.forEach(o => {
     const s = o.season || 'Sin temporada';
@@ -80,7 +82,7 @@ function renderSeasonReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
       </div>
       <div class="table-responsive">
         <table class="table table-hover">
-          <thead><tr><th>Temporada</th><th class="text-end">Pedidos</th><th class="text-end">Unidades</th><th class="text-end">Ventas</th><th class="text-end">Costo</th><th class="text-end">Margen</th></tr></thead>
+          <thead><tr><th>Temporada</th><th class="text-end">Pedidos</th><th class="text-end">Unidades</th><th class="text-end">Ventas</th>${showCost ? '<th class="text-end">Costo</th><th class="text-end">Margen</th>' : ''}</tr></thead>
           <tbody>
             ${rows.map(r => {
               const margin = r.revenue > 0 ? ((r.revenue - r.cost) / r.revenue * 100) : 0;
@@ -89,8 +91,8 @@ function renderSeasonReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
                 <td class="text-end">${r.orders}</td>
                 <td class="text-end">${fNum(r.qty)}</td>
                 <td class="text-end">${fCurrency(r.revenue)}</td>
-                <td class="text-end">${fCurrency(r.cost)}</td>
-                <td class="text-end"><span class="badge ${margin > 30 ? 'badge-success' : 'badge-warning'}">${margin.toFixed(1)}%</span></td>
+                ${showCost ? `<td class="text-end">${fCurrency(r.cost)}</td>
+                <td class="text-end"><span class="badge ${margin > 30 ? 'badge-success' : 'badge-warning'}">${margin.toFixed(1)}%</span></td>` : ''}
               </tr>`;
             }).join('')}
           </tbody>
@@ -124,7 +126,7 @@ function renderSeasonReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
     { key: 'orders',  header: 'Pedidos' },
     { key: 'qty',     header: 'Unidades' },
     { key: 'revenue', header: 'Ventas',  format: v => fCurrency(v) },
-    { key: 'cost',    header: 'Costo',   format: v => fCurrency(v) }
+    ...(showCost ? [{ key: 'cost', header: 'Costo', format: v => fCurrency(v) }] : [])
   ];
   document.getElementById('rpt-s-pdf')?.addEventListener('click', () => exportPDF('Ventas por Temporada', COLS, rows, 'ventas-temporada.pdf'));
   document.getElementById('rpt-s-xls')?.addEventListener('click', () => exportExcel('Temporada', COLS, rows, 'ventas-temporada.xlsx'));
@@ -132,6 +134,7 @@ function renderSeasonReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
 
 // ---- BY SELLER ----
 function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
+  const showCost = canSeeCost();
   const map = {};
   orders.forEach(o => {
     const s = o.users?.name || 'Sin asignar';
@@ -162,7 +165,7 @@ function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
       </div>
       <div class="table-responsive">
         <table class="table table-hover">
-          <thead><tr><th>Vendedor</th><th class="text-end">Pedidos</th><th class="text-end">Unidades</th><th class="text-end">Ventas</th><th class="text-end">Costo</th><th class="text-end">Margen</th></tr></thead>
+          <thead><tr><th>Vendedor</th><th class="text-end">Pedidos</th><th class="text-end">Unidades</th><th class="text-end">Ventas</th>${showCost ? '<th class="text-end">Costo</th><th class="text-end">Margen</th>' : ''}</tr></thead>
           <tbody>
             ${rows.map(r => {
               const margin = r.revenue > 0 ? ((r.revenue - r.cost) / r.revenue * 100) : 0;
@@ -171,8 +174,8 @@ function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
                 <td class="text-end">${r.orders}</td>
                 <td class="text-end">${fNum(r.qty)}</td>
                 <td class="text-end">${fCurrency(r.revenue)}</td>
-                <td class="text-end">${fCurrency(r.cost)}</td>
-                <td class="text-end"><span class="badge ${margin > 30 ? 'badge-success' : 'badge-warning'}">${margin.toFixed(1)}%</span></td>
+                ${showCost ? `<td class="text-end">${fCurrency(r.cost)}</td>
+                <td class="text-end"><span class="badge ${margin > 30 ? 'badge-success' : 'badge-warning'}">${margin.toFixed(1)}%</span></td>` : ''}
               </tr>`;
             }).join('')}
           </tbody>
@@ -205,7 +208,7 @@ function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
     { key: 'orders',  header: 'Pedidos' },
     { key: 'qty',     header: 'Unidades' },
     { key: 'revenue', header: 'Ventas', format: v => fCurrency(v) },
-    { key: 'cost',    header: 'Costo',  format: v => fCurrency(v) }
+    ...(showCost ? [{ key: 'cost', header: 'Costo', format: v => fCurrency(v) }] : [])
   ];
   document.getElementById('rpt-v-pdf')?.addEventListener('click', () => exportPDF('Ventas por Vendedor', COLS, rows, 'ventas-vendedor.pdf'));
   document.getElementById('rpt-v-xls')?.addEventListener('click', () => exportExcel('Vendedor', COLS, rows, 'ventas-vendedor.xlsx'));

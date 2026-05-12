@@ -45,6 +45,7 @@ export async function renderUsers(container) {
 
   function formHTML(u = {}) {
     const isEdit = !!u.id;
+    const isUserRole = (u.role || 'user') !== 'admin';
     return `<form id="usr-form" class="form-grid-2">
       <div class="form-group">
         <label class="form-label req">Nombre</label>
@@ -60,11 +61,43 @@ export async function renderUsers(container) {
       </div>
       <div class="form-group">
         <label class="form-label">Rol</label>
-        <select name="role" class="form-control">
-          <option value="user" ${u.role === 'user' ? 'selected' : ''}>Usuario</option>
+        <select name="role" id="usr-role-select" class="form-control">
+          <option value="user"  ${(u.role || 'user') === 'user'  ? 'selected' : ''}>Usuario</option>
           <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Administrador</option>
         </select>
       </div>
+
+      <!-- Permisos adicionales — solo visibles para rol Usuario -->
+      <div class="form-group span-2" id="perms-section" ${isUserRole ? '' : 'style="display:none"'}>
+        <label class="form-label">Permisos adicionales</label>
+        <div class="perms-grid">
+          <label class="perm-toggle">
+            <input type="checkbox" name="can_see_cost" ${u.can_see_cost ? 'checked' : ''}>
+            <span class="perm-label">
+              <i class="fas fa-eye"></i>
+              <strong>Ver precio de costo</strong>
+              <small>Puede ver precios de costo en productos y reportes</small>
+            </span>
+          </label>
+          <label class="perm-toggle">
+            <input type="checkbox" name="can_edit_products" ${u.can_edit_products ? 'checked' : ''}>
+            <span class="perm-label">
+              <i class="fas fa-edit"></i>
+              <strong>Crear / Editar productos</strong>
+              <small>Puede agregar y modificar productos y variantes</small>
+            </span>
+          </label>
+          <label class="perm-toggle">
+            <input type="checkbox" name="can_delete_products" ${u.can_delete_products ? 'checked' : ''}>
+            <span class="perm-label">
+              <i class="fas fa-trash"></i>
+              <strong>Eliminar productos</strong>
+              <small>Puede eliminar productos del catálogo</small>
+            </span>
+          </label>
+        </div>
+      </div>
+
       <div class="form-footer span-2">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
         <button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar</button>
@@ -77,16 +110,32 @@ export async function renderUsers(container) {
       let u = {};
       if (id) { const { data } = await db.from('users').select('*').eq('id', id).single(); u = data || {}; }
       openModal(id ? 'Editar Usuario' : 'Nuevo Usuario', formHTML(u));
+
+      // Show/hide permissions section when role changes
+      document.getElementById('usr-role-select')?.addEventListener('change', e => {
+        const perms = document.getElementById('perms-section');
+        if (perms) perms.style.display = e.target.value === 'admin' ? 'none' : '';
+      });
+
       document.getElementById('usr-form').addEventListener('submit', async e => {
         e.preventDefault();
         const btn = e.target.querySelector('[type=submit]');
         setLoading(btn, true);
-        const fd = new FormData(e.target);
+        const fd  = new FormData(e.target);
         const pwd = fd.get('password');
-        const payload = { name: fd.get('name'), role: fd.get('role'), updated_at: new Date().toISOString() };
+        const role = fd.get('role');
+        const payload = {
+          name: fd.get('name'),
+          role,
+          // permissions: always save; admins get true by default via canXxx() helpers
+          can_see_cost:        role === 'admin' ? true : fd.has('can_see_cost'),
+          can_edit_products:   role === 'admin' ? true : fd.has('can_edit_products'),
+          can_delete_products: role === 'admin' ? true : fd.has('can_delete_products'),
+          updated_at: new Date().toISOString()
+        };
         if (pwd) payload.password_hash = await hashPwd(pwd);
         if (!id) {
-          payload.email  = fd.get('email').toLowerCase().trim();
+          payload.email = fd.get('email').toLowerCase().trim();
           if (!payload.password_hash) { toast('La contraseña es requerida', 'warning'); setLoading(btn, false); return; }
         }
         const { error } = id

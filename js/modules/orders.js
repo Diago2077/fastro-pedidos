@@ -254,10 +254,6 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
           ${Object.entries(statusMap).map(([k, v]) => `<option value="${k}" ${order.status === k ? 'selected' : ''}>${v}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group span-full">
-        <label class="form-label">Observación</label>
-        <textarea name="observation" class="form-control" rows="2">${esc(order.observation || '')}</textarea>
-      </div>
     </div>
 
     <!-- PRODUCT SEARCH -->
@@ -282,6 +278,12 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
       <div class="totals-row"><span>Subtotal</span><span id="tot-sub">$0.00</span></div>
       <div class="totals-row"><span>Descuento (<span id="tot-disc-pct">0</span>%)</span><span id="tot-disc">-$0.00</span></div>
       <div class="totals-row totals-final"><span>TOTAL</span><span id="tot-final">$0.00</span></div>
+    </div>
+
+    <!-- OBSERVACIÓN -->
+    <div class="form-group mt-3">
+      <label class="form-label">Observación</label>
+      <textarea name="observation" class="form-control" rows="2">${esc(order.observation || '')}</textarea>
     </div>
 
     <!-- FOOTER -->
@@ -312,15 +314,21 @@ function showProductGrid(product) {
     return `<th class="text-center"><div>${esc(s)}</div><div class="sz-price">${fCurrency(anyVar?.sale_price || 0)}</div></th>`;
   }).join('');
 
+  // Build a lookup of existing quantities already in the order
+  const existingQtyMap = {};
+  _state.items.forEach(item => { existingQtyMap[item.variantId] = item.qty; });
+
   const bodyRows = colors.map(color => {
     const cells = sizes.map(size => {
       const v = variantMap[`${color}|||${size}`];
       if (!v) return `<td class="cell-na">–</td>`;
+      const existingQty = existingQtyMap[v.id] || '';
+      const highlight   = existingQty ? 'style="width:65px;border-color:var(--accent);background:#fff8f8"' : 'style="width:65px"';
       return `<td class="text-center"><input type="number" min="0" class="form-control form-control-sm grid-qty text-center"
         data-variant-id="${v.id}" data-code="${esc(product.code)}" data-desc="${esc(product.description)}"
         data-color="${esc(color)}" data-size="${esc(size)}"
         data-sale="${v.sale_price}" data-cost="${v.cost_price}"
-        placeholder="0" style="width:65px"></td>`;
+        value="${existingQty}" placeholder="0" ${highlight}></td>`;
     }).join('');
     return `<tr><td><strong>${esc(color)}</strong></td>${cells}</tr>`;
   }).join('');

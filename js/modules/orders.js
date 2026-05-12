@@ -78,7 +78,8 @@ export async function renderOrders(container) {
     </table>`;
   }
 
-  window._ord = {
+  // Use Object.assign so updateQty / removeItem defined at module level are not overwritten
+  Object.assign(window._ord = window._ord || {}, {
     new() { openOrderModal(null, () => load()); },
     open(id) { openOrderModal(id, () => load()); },
     async del(id) {
@@ -86,7 +87,7 @@ export async function renderOrders(container) {
       await db.from('orders').delete().eq('id', id);
       toast('Pedido eliminado'); load();
     }
-  };
+  });
 
   document.getElementById('q-ord')?.addEventListener('input', debounce(e => {
     load(e.target.value.trim(), document.getElementById('filter-status').value);

@@ -10,6 +10,10 @@ let _state = {
 };
 let _allOrders = [];
 
+const STATUS_LABELS = { open: 'Abierto', sent: 'Enviado', closed: 'Cerrado' };
+function nextStatus(s) { return { open: 'sent', sent: 'closed', closed: 'open' }[s] || 'open'; }
+function todayISO() { return new Date().toISOString().split('T')[0]; }
+
 export async function renderOrders(container) {
   container.innerHTML = `
     <div class="card">
@@ -66,7 +70,7 @@ export async function renderOrders(container) {
             <td>${esc(o.providers?.name || '–')}</td>
             <td>${esc(o.season || '–')}</td>
             <td>${fCurrency(tot)}</td>
-            <td>${statusBadge(o.status)}</td>
+            <td><button class="status-btn status-${o.status}" onclick="window._ord.changeStatus('${o.id}','${o.status}')">${STATUS_LABELS[o.status] || o.status}</button></td>
             <td>${fDate(o.created_at)}</td>
             <td class="td-actions">
               <button class="btn btn-xs btn-outline" title="Ver / Editar" onclick="window._ord.open('${o.id}')"><i class="fas fa-eye"></i></button>
@@ -86,6 +90,15 @@ export async function renderOrders(container) {
       if (!await confirm2('¿Eliminar este pedido definitivamente?')) return;
       await db.from('orders').delete().eq('id', id);
       toast('Pedido eliminado'); load();
+    },
+    async changeStatus(id, current) {
+      const next = nextStatus(current);
+      if (!await confirm2(`¿Cambiar estado a "${STATUS_LABELS[next]}"?`)) return;
+      const update = { status: next, updated_at: new Date().toISOString() };
+      if (next === 'sent') update.shipping_date = todayISO();
+      await db.from('orders').update(update).eq('id', id);
+      toast(`Estado: ${STATUS_LABELS[next]}`);
+      load();
     }
   });
 
@@ -183,6 +196,18 @@ async function openOrderModal(orderId, onSavedFn) {
     if (!e.target.closest('#prod-search-wrap')) searchResults?.classList.add('hidden');
   }, { once: true });
 
+  // Status button — cycle with confirmation
+  document.getElementById('order-status-btn')?.addEventListener('click', async () => {
+    const current = document.getElementById('order-status-val').value;
+    const next = nextStatus(current);
+    if (!await confirm2(`¿Cambiar estado a "${STATUS_LABELS[next]}"?`)) return;
+    document.getElementById('order-status-val').value = next;
+    const btn = document.getElementById('order-status-btn');
+    btn.className = `status-btn status-${next}`;
+    btn.innerHTML = `${STATUS_LABELS[next]} <i class="fas fa-sync-alt fa-xs" style="margin-left:5px;opacity:.5"></i>`;
+    if (next === 'sent') document.getElementById('order-shipping-date-val').value = todayISO();
+  });
+
   // Form submit
   document.getElementById('order-form')?.addEventListener('submit', e => {
     e.preventDefault();
@@ -213,7 +238,6 @@ async function openOrderModal(orderId, onSavedFn) {
 function buildOrderFormHTML(order, clients, providers, orderId) {
   const clientOpts   = clients.map(c => `<option value="${c.id}" ${order.client_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   const providerOpts = providers.map(p => `<option value="${p.id}" ${order.provider_id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
-  const statusMap    = { open: 'Abierto', closed: 'Cerrado', sent: 'Enviado' };
 
   return `
   <form id="order-form">
@@ -244,16 +268,13 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
         <input type="number" name="discount_pct" class="form-control" min="0" max="100" step="0.1"
           value="${order.discount_pct || 0}" id="discount-input">
       </div>
-      <div class="form-group">
-        <label class="form-label">Fecha de Envío</label>
-        <input type="date" name="shipping_date" class="form-control"
-          value="${order.shipping_date || ''}">
-      </div>
+      <input type="hidden" name="shipping_date" id="order-shipping-date-val" value="${order.shipping_date || ''}">
+      <input type="hidden" name="status" id="order-status-val" value="${order.status || 'open'}">
       <div class="form-group">
         <label class="form-label">Estado</label>
-        <select name="status" class="form-control">
-          ${Object.entries(statusMap).map(([k, v]) => `<option value="${k}" ${order.status === k ? 'selected' : ''}>${v}</option>`).join('')}
-        </select>
+        <button type="button" id="order-status-btn" class="status-btn status-${order.status || 'open'}">
+          ${STATUS_LABELS[order.status || 'open']} <i class="fas fa-sync-alt fa-xs" style="margin-left:5px;opacity:.5"></i>
+        </button>
       </div>
     </div>
 
@@ -467,7 +488,7 @@ async function saveOrder(originalOrder, orderId, onSavedFn) {
     provider_id:  fd.get('provider_id')  || null,
     season:       fd.get('season')       || null,
     discount_pct: parseFloat(fd.get('discount_pct')) || 0,
-    shipping_date: fd.get('shipping_date') || null,
+    shipping_date: fd.get('shipping_date') || (fd.get('status') === 'sent' ? todayISO() : null),
     status:       fd.get('status'),
     observation:  fd.get('observation')  || null,
     updated_at:   new Date().toISOString()

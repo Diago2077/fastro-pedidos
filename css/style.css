@@ -394,6 +394,25 @@ select.form-control { cursor: pointer; }
 .badge-info      { background: #bee3f8; color: #2a4a7f; }
 .badge-secondary { background: #e2e8f0; color: #4a5568; }
 
+/* Status buttons (order list + form) */
+.status-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: filter .15s, transform .1s;
+  white-space: nowrap;
+}
+.status-btn:hover  { filter: brightness(.92); transform: scale(1.03); }
+.status-btn:active { transform: scale(.97); }
+.status-btn.status-open   { background: #bee3f8; color: #2a4a7f; }
+.status-btn.status-sent   { background: #c6f6d5; color: #276749; }
+.status-btn.status-closed { background: #fefcbf; color: #744210; }
+
 /* ============================================================
    SEARCH BOX
    ============================================================ */

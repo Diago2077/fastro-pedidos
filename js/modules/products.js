@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc, fCurrency } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canSeeCost, canCreateProducts, canEditProducts, canDeleteProducts, canExportExcel } from '../auth.js';
 
@@ -43,11 +43,15 @@ export async function renderProducts(container) {
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay productos registrados'); return; }
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th>Código</th><th>Descripción</th><th>Marca</th><th>Proveedor</th><th>Temporada</th><th>Colores</th><th>Tallas</th><th></th></tr></thead>
+      <thead><tr><th>Código</th><th>Descripción</th><th>Marca</th><th>Proveedor</th><th>Temporada</th><th>Colores</th><th>Tallas</th><th class="text-end">Precio Venta</th><th></th></tr></thead>
       <tbody>
         ${rows.map(p => {
           const colors = [...new Set((p.product_variants || []).map(v => v.color))].join(', ');
           const sizes  = [...new Set((p.product_variants || []).map(v => v.size))].join(', ');
+          const prices = (p.product_variants || []).map(v => v.sale_price).filter(x => x > 0);
+          const minP = prices.length ? Math.min(...prices) : null;
+          const maxP = prices.length ? Math.max(...prices) : null;
+          const priceLabel = minP === null ? '–' : minP === maxP ? fCurrency(minP) : `${fCurrency(minP)} – ${fCurrency(maxP)}`;
           return `<tr>
             <td><strong>${esc(p.code)}</strong></td>
             <td>${esc(p.description)}</td>
@@ -56,6 +60,7 @@ export async function renderProducts(container) {
             <td>${esc(p.season || '–')}</td>
             <td><span class="text-muted small">${esc(colors || '–')}</span></td>
             <td><span class="text-muted small">${esc(sizes || '–')}</span></td>
+            <td class="text-end">${priceLabel}</td>
             <td class="td-actions">
               ${_canEdit   ? `<button class="btn btn-xs btn-outline" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
               ${_canDelete ? `<button class="btn btn-xs btn-danger-outline" onclick="window._pr.del('${p.id}')"><i class="fas fa-trash"></i></button>` : ''}

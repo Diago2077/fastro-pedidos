@@ -359,29 +359,44 @@ function showProductGrid(product) {
   document.getElementById('btn-close-grid')?.addEventListener('click', () => { wrap.innerHTML = ''; });
 
   document.getElementById('btn-add-to-order')?.addEventListener('click', () => {
-    const inputs = [...wrap.querySelectorAll('.grid-qty')].filter(i => parseInt(i.value) > 0);
-    if (!inputs.length) { toast('Ingresa al menos una cantidad', 'warning'); return; }
-    inputs.forEach(inp => {
-      const qty = parseInt(inp.value);
-      if (qty <= 0) return;
-      // Remove duplicate variant if already exists
-      _state.items = _state.items.filter(item => item.variantId !== inp.dataset.variantId);
-      _state.items.push({
-        variantId:   inp.dataset.variantId,
-        code:        inp.dataset.code,
-        description: inp.dataset.desc,
-        color:       inp.dataset.color,
-        size:        inp.dataset.size,
-        qty,
-        salePrice:   parseFloat(inp.dataset.sale),
-        costPrice:   parseFloat(inp.dataset.cost)
-      });
+    const allInputs = [...wrap.querySelectorAll('.grid-qty')];
+    let added = 0, removed = 0;
+
+    allInputs.forEach(inp => {
+      const qty       = parseInt(inp.value) || 0;
+      const variantId = inp.dataset.variantId;
+      const hadItem   = _state.items.some(item => item.variantId === variantId);
+
+      // Always remove the existing entry for this variant first
+      _state.items = _state.items.filter(item => item.variantId !== variantId);
+
+      if (qty > 0) {
+        _state.items.push({
+          variantId,
+          code:        inp.dataset.code,
+          description: inp.dataset.desc,
+          color:       inp.dataset.color,
+          size:        inp.dataset.size,
+          qty,
+          salePrice:   parseFloat(inp.dataset.sale),
+          costPrice:   parseFloat(inp.dataset.cost)
+        });
+        added++;
+      } else if (hadItem) {
+        removed++; // was in order, now set to 0 → deleted
+      }
     });
+
+    if (added === 0 && removed === 0) { toast('Ingresa al menos una cantidad', 'warning'); return; }
+
     renderItemsTable();
     updateTotals();
     wrap.innerHTML = '';
     document.getElementById('prod-search').value = '';
-    toast('Productos agregados', 'success');
+
+    if (added > 0 && removed > 0) toast(`${added} variante(s) actualizadas, ${removed} eliminada(s)`, 'success');
+    else if (added > 0)            toast(`${added} variante(s) agregadas al pedido`, 'success');
+    else                           toast(`${removed} variante(s) eliminadas del pedido`, 'info');
   });
 }
 

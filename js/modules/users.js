@@ -1,20 +1,21 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, setLoading, hashPwd, esc } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, setLoading, esc } from '../utils/helpers.js';
 import { getSession } from '../auth.js';
 
 export async function renderUsers(container) {
   container.innerHTML = `
     <div class="card">
       <div class="card-header">
-        <div class="card-actions">
-          <button class="btn btn-accent" onclick="window._usr.form()"><i class="fas fa-plus"></i> Nuevo Usuario</button>
+        <div class="user-create-hint">
+          <i class="fas fa-info-circle"></i>
+          <span>Para <strong>crear</strong> un usuario nuevo, agregalo en Supabase → <em>Authentication → Add user</em> (con "Auto Confirm"). Aparecerá aquí automáticamente para asignarle rol y permisos.</span>
         </div>
       </div>
       <div class="table-responsive" id="usr-tbl"></div>
     </div>`;
 
   async function load() {
-    const { data, error } = await db.from('users').select('id, name, email, role, active, created_at').order('name');
+    const { data, error } = await db.from('profiles').select('id, name, email, role, active, created_at').order('name');
     if (error) { toast('Error al cargar usuarios', 'error'); return; }
     render(data || []);
   }
@@ -28,7 +29,7 @@ export async function renderUsers(container) {
       <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Creado</th><th></th></tr></thead>
       <tbody>
         ${rows.map(u => `<tr>
-          <td><strong>${esc(u.name)}</strong>${u.id === currentId ? ' <span class="badge badge-info">Yo</span>' : ''}</td>
+          <td><strong>${esc(u.name || '—')}</strong>${u.id === currentId ? ' <span class="badge badge-info">Yo</span>' : ''}</td>
           <td>${esc(u.email)}</td>
           <td><span class="badge ${u.role === 'admin' ? 'badge-danger' : 'badge-secondary'}">${u.role === 'admin' ? 'Admin' : 'Usuario'}</span></td>
           <td><span class="badge ${u.active ? 'badge-success' : 'badge-secondary'}">${u.active ? 'Activo' : 'Inactivo'}</span></td>
@@ -44,7 +45,6 @@ export async function renderUsers(container) {
   }
 
   function formHTML(u = {}) {
-    const isEdit = !!u.id;
     const isUserRole = (u.role || 'user') !== 'admin';
     return `<form id="usr-form" class="form-grid-2">
       <div class="form-group">
@@ -52,14 +52,10 @@ export async function renderUsers(container) {
         <input type="text" name="name" class="form-control" value="${esc(u.name || '')}" required>
       </div>
       <div class="form-group">
-        <label class="form-label req">Correo Electrónico</label>
-        <input type="email" name="email" class="form-control" value="${esc(u.email || '')}" required ${isEdit ? 'readonly' : ''}>
+        <label class="form-label">Correo Electrónico</label>
+        <input type="email" name="email" class="form-control" value="${esc(u.email || '')}" readonly>
       </div>
-      <div class="form-group">
-        <label class="form-label ${isEdit ? '' : 'req'}">Contraseña ${isEdit ? '(dejar vacío para no cambiar)' : ''}</label>
-        <input type="password" name="password" class="form-control" ${isEdit ? '' : 'required'} minlength="6" placeholder="Mínimo 6 caracteres">
-      </div>
-      <div class="form-group">
+      <div class="form-group span-2">
         <label class="form-label">Rol</label>
         <select name="role" id="usr-role-select" class="form-control">
           <option value="user"  ${(u.role || 'user') === 'user'  ? 'selected' : ''}>Usuario</option>
@@ -144,11 +140,11 @@ export async function renderUsers(container) {
 
   window._usr = {
     async form(id) {
-      let u = {};
-      if (id) { const { data } = await db.from('users').select('*').eq('id', id).single(); u = data || {}; }
-      openModal(id ? 'Editar Usuario' : 'Nuevo Usuario', formHTML(u));
+      const { data } = await db.from('profiles').select('*').eq('id', id).single();
+      const u = data || {};
+      openModal('Editar Usuario', formHTML(u));
 
-      // Show/hide permissions section when role changes
+      // Mostrar/ocultar permisos según el rol
       document.getElementById('usr-role-select')?.addEventListener('change', e => {
         const perms = document.getElementById('perms-section');
         if (perms) perms.style.display = e.target.value === 'admin' ? 'none' : '';
@@ -158,60 +154,45 @@ export async function renderUsers(container) {
         e.preventDefault();
         const btn = e.target.querySelector('[type=submit]');
         setLoading(btn, true);
-        const fd  = new FormData(e.target);
-        const pwd = fd.get('password');
+        const fd   = new FormData(e.target);
         const role = fd.get('role');
         const payload = {
           name: fd.get('name'),
           role,
-          // permissions: always save; admins get true by default via canXxx() helpers
-          // general
+          // permisos: siempre se guardan; admin = true por defecto vía canXxx()
           can_see_cost:           role === 'admin' ? true : fd.has('can_see_cost'),
           can_export_excel:       role === 'admin' ? true : fd.has('can_export_excel'),
-          // dashboard
           can_view_dashboard:     role === 'admin' ? true : fd.has('can_view_dashboard'),
-          // pedidos
           can_view_orders:        role === 'admin' ? true : fd.has('can_view_orders'),
           can_create_orders:      role === 'admin' ? true : fd.has('can_create_orders'),
           can_edit_orders:        role === 'admin' ? true : fd.has('can_edit_orders'),
           can_delete_orders:      role === 'admin' ? true : fd.has('can_delete_orders'),
-          // clientes
           can_view_clients:       role === 'admin' ? true : fd.has('can_view_clients'),
           can_create_clients:     role === 'admin' ? true : fd.has('can_create_clients'),
           can_edit_clients:       role === 'admin' ? true : fd.has('can_edit_clients'),
           can_delete_clients:     role === 'admin' ? true : fd.has('can_delete_clients'),
-          // productos
           can_view_products:      role === 'admin' ? true : fd.has('can_view_products'),
           can_create_products:    role === 'admin' ? true : fd.has('can_create_products'),
           can_edit_products:      role === 'admin' ? true : fd.has('can_edit_products'),
           can_delete_products:    role === 'admin' ? true : fd.has('can_delete_products'),
-          // proveedores
           can_view_providers:     role === 'admin' ? true : fd.has('can_view_providers'),
           can_create_providers:   role === 'admin' ? true : fd.has('can_create_providers'),
           can_edit_providers:     role === 'admin' ? true : fd.has('can_edit_providers'),
           can_delete_providers:   role === 'admin' ? true : fd.has('can_delete_providers'),
-          // reportes
           can_view_reports:       role === 'admin' ? true : fd.has('can_view_reports'),
           updated_at: new Date().toISOString()
         };
-        if (pwd) payload.password_hash = await hashPwd(pwd);
-        if (!id) {
-          payload.email = fd.get('email').toLowerCase().trim();
-          if (!payload.password_hash) { toast('La contraseña es requerida', 'warning'); setLoading(btn, false); return; }
-        }
-        const { error } = id
-          ? await db.from('users').update(payload).eq('id', id)
-          : await db.from('users').insert(payload);
+        const { error } = await db.from('profiles').update(payload).eq('id', id);
         setLoading(btn, false);
         if (error) { toast('Error: ' + error.message, 'error'); return; }
-        toast(id ? 'Usuario actualizado' : 'Usuario creado');
+        toast('Usuario actualizado');
         closeModal(); load();
       });
     },
     async toggle(id, active) {
       const msg = active ? '¿Desactivar este usuario?' : '¿Reactivar este usuario?';
       if (!await confirm2(msg)) return;
-      await db.from('users').update({ active: !active }).eq('id', id);
+      await db.from('profiles').update({ active: !active }).eq('id', id);
       toast(active ? 'Usuario desactivado' : 'Usuario reactivado'); load();
     }
   };

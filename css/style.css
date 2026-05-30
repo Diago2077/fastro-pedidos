@@ -936,6 +936,21 @@ select.form-control { cursor: pointer; }
 .import-summary-box span { display: flex; align-items: center; gap: 6px; }
 .import-summary-box i { color: var(--success); }
 
+/* Aviso "crear usuario en el panel" */
+.user-create-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: .85em;
+  color: var(--text-muted);
+  background: var(--accent-light);
+  border: 1px solid #fbd6d6;
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  width: 100%;
+}
+.user-create-hint i { color: var(--accent); margin-top: 2px; }
+
 /* Permission table (module × action grid) */
 .perms-table {
   border: 1px solid var(--border);

@@ -1,7 +1,8 @@
 // ============================================================
 // FASTRO S.A. — App Entry Point
 // ============================================================
-import { getSession, saveSession, clearSession, login, isAdmin, refreshSession,
+import { db } from './supabase.js';
+import { initAuth, login, logout, isAdmin,
   canViewDashboard, canViewOrders, canViewClients,
   canViewProducts, canViewProviders, canViewReports } from './auth.js';
 import { avatarInitials, closeModal, toast } from './utils/helpers.js';
@@ -31,19 +32,18 @@ let currentSection = 'dashboard';
 // ============================================================
 // BOOT
 // ============================================================
+let _authReady = false;
+
+// Si la sesión se cierra (logout o token vencido), volver al login.
+// El guard _authReady evita recargas durante el arranque.
+db.auth.onAuthStateChange((event) => {
+  if (_authReady && event === 'SIGNED_OUT') window.location.reload();
+});
+
 document.addEventListener('DOMContentLoaded', async () => {
-  const session = getSession();
-  if (session) {
-    const fresh = await refreshSession();
-    if (fresh) {
-      showApp(fresh);
-    } else {
-      clearSession();
-      showLogin();
-    }
-  } else {
-    showLogin();
-  }
+  const profile = await initAuth();
+  if (profile) showApp(profile); else showLogin();
+  _authReady = true;
 });
 
 // ============================================================
@@ -65,7 +65,6 @@ function showLogin() {
 
     try {
       const user = await login(email, pwd);
-      saveSession(user);
       showApp(user);
     } catch (err) {
       errEl.textContent = err.message;
@@ -123,10 +122,8 @@ function showApp(user) {
   document.getElementById('sidebar-close')?.addEventListener('click', closeSidebarMobile);
   document.getElementById('sidebar-overlay')?.addEventListener('click', closeSidebarMobile);
 
-  // Logout
-  document.getElementById('logout-btn')?.addEventListener('click', () => {
-    clearSession(); window.location.reload();
-  });
+  // Logout (signOut → onAuthStateChange recarga al login)
+  document.getElementById('logout-btn')?.addEventListener('click', () => { logout(); });
 
   // Modal close
   document.getElementById('modal-close')?.addEventListener('click', closeModal);

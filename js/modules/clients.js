@@ -4,6 +4,7 @@ import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateClients, canEditClients, canDeleteClients } from '../auth.js';
 
 const COLS = [
+  { key: 'code',       header: 'Código',   width: 10 },
   { key: 'name',       header: 'Nombre',   width: 20 },
   { key: 'store_name', header: 'Tienda',   width: 20 },
   { key: 'ruc',        header: 'RUC',      width: 15 },
@@ -33,7 +34,7 @@ export async function renderClients(container) {
     </div>`;
 
   async function load(q = '') {
-    let query = db.from('clients').select('*').eq('active', true).order('name');
+    let query = db.from('clients').select('*').eq('active', true).order('code', { nullsFirst: false });
     if (q) query = query.ilike('name', `%${q}%`);
     const { data, error } = await query;
     if (error) { toast('Error al cargar clientes', 'error'); return; }
@@ -46,10 +47,11 @@ export async function renderClients(container) {
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay clientes registrados'); return; }
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th>Nombre</th><th>Tienda</th><th>RUC</th><th>Teléfono</th><th>Ciudad</th><th>Correo</th><th></th></tr></thead>
+      <thead><tr><th>Código</th><th>Nombre</th><th>Tienda</th><th>RUC</th><th>Teléfono</th><th>Ciudad</th><th>Correo</th><th></th></tr></thead>
       <tbody>
         ${rows.map(c => `<tr>
-          <td><strong>${esc(c.name)}</strong></td>
+          <td><strong>${c.code ?? '–'}</strong></td>
+          <td>${esc(c.name)}</td>
           <td>${esc(c.store_name || '–')}</td>
           <td>${esc(c.ruc || '–')}</td>
           <td>${esc(c.phone || '–')}</td>
@@ -66,6 +68,10 @@ export async function renderClients(container) {
 
   function formHTML(c = {}) {
     return `<form id="cl-form" class="form-grid-2">
+      <div class="form-group">
+        <label class="form-label req">Código</label>
+        <input type="number" name="code" class="form-control" value="${c.code ?? ''}" min="1" step="1" required placeholder="Ej: 1024">
+      </div>
       <div class="form-group">
         <label class="form-label req">Nombre</label>
         <input type="text" name="name" class="form-control" value="${esc(c.name || '')}" required>
@@ -107,11 +113,15 @@ export async function renderClients(container) {
         const btn = e.target.querySelector('[type=submit]');
         setLoading(btn, true);
         const p = Object.fromEntries(new FormData(e.target));
+        p.code = p.code ? parseInt(p.code, 10) : null;
         const { error } = id
           ? await db.from('clients').update({ ...p, updated_at: new Date().toISOString() }).eq('id', id)
           : await db.from('clients').insert(p);
         setLoading(btn, false);
-        if (error) { toast('Error: ' + error.message, 'error'); return; }
+        if (error) {
+          const msg = error.code === '23505' ? `El código ${p.code} ya está en uso por otro cliente` : 'Error: ' + error.message;
+          toast(msg, 'error'); return;
+        }
         toast(id ? 'Cliente actualizado' : 'Cliente creado');
         closeModal(); load();
       });
@@ -142,6 +152,13 @@ function normalizeHeader(h) {
 }
 
 const CLIENT_HEADER_MAP = {
+  codigo:            'code',
+  code:              'code',
+  cod:               'code',
+  nrocliente:        'code',
+  numero:            'code',
+  nro:               'code',
+  id:                'code',
   nombre:            'name',
   name:              'name',
   cliente:           'name',
@@ -174,19 +191,28 @@ function parseClientRows(sheet) {
   if (raw.length < 2) return { rows: [], errors: ['El archivo no tiene datos'] };
 
   const headers = raw[0].map(h => CLIENT_HEADER_MAP[normalizeHeader(h)] || null);
-  if (!headers.includes('name')) {
-    return { rows: [], errors: ['Falta la columna obligatoria: Nombre'] };
+  const missing = ['code', 'name'].filter(f => !headers.includes(f));
+  if (missing.length) {
+    const labels = { code: 'Código', name: 'Nombre' };
+    return { rows: [], errors: [`Columnas obligatorias faltantes: ${missing.map(m => labels[m]).join(', ')}`] };
   }
 
   const rows = [];
+  let skipped = 0;
   for (let i = 1; i < raw.length; i++) {
     const rowRaw = raw[i];
     if (rowRaw.every(c => !c)) continue; // saltar filas vacías
     const row = {};
     headers.forEach((field, idx) => { if (field) row[field] = rowRaw[idx]; });
-    if (!row.name || !String(row.name).trim()) continue;
+
+    const code = parseInt(String(row.code).trim(), 10);
+    const name = row.name ? String(row.name).trim() : '';
+    // Código obligatorio y numérico; nombre obligatorio
+    if (!Number.isInteger(code) || code <= 0 || !name) { skipped++; continue; }
+
     rows.push({
-      name:       String(row.name).trim(),
+      code,
+      name,
       store_name: row.store_name ? String(row.store_name).trim() : '',
       ruc:        row.ruc   ? String(row.ruc).trim()   : '',
       phone:      row.phone ? String(row.phone).trim() : '',
@@ -194,17 +220,18 @@ function parseClientRows(sheet) {
       email:      row.email ? String(row.email).trim() : '',
     });
   }
-  return { rows, errors: [] };
+  return { rows, errors: [], skipped };
 }
 
 function openClientImportModal(reloadFn) {
   const html = `
     <div class="import-wrap">
       <div class="import-info">
-        <p class="mb-2"><strong>Formato:</strong> una fila por cliente. Sólo <strong>Nombre</strong> es obligatorio.</p>
+        <p class="mb-2"><strong>Formato:</strong> una fila por cliente. <strong>Código</strong> y <strong>Nombre</strong> son obligatorios. Si el código ya existe, se actualizan sus datos.</p>
         <table class="table table-sm table-bordered" style="font-size:.82em">
           <thead><tr><th>Columna</th><th>Descripción</th><th>Req.</th></tr></thead>
           <tbody>
+            <tr><td><code>Codigo</code></td><td>Código numérico único del cliente</td><td>✓</td></tr>
             <tr><td><code>Nombre</code></td><td>Nombre del cliente</td><td>✓</td></tr>
             <tr><td><code>Tienda</code></td><td>Nombre de la tienda</td><td></td></tr>
             <tr><td><code>RUC</code></td><td>RUC / cédula</td><td></td></tr>
@@ -265,30 +292,31 @@ function openClientImportModal(reloadFn) {
     reader.onload = e => {
       const wb = window.XLSX.read(e.target.result, { type: 'array' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const { rows, errors } = parseClientRows(sheet);
+      const { rows, errors, skipped } = parseClientRows(sheet);
       if (errors.length) { toast(errors[0], 'error'); return; }
-      if (!rows.length) { toast('No se encontraron clientes válidos en el archivo', 'warning'); return; }
+      if (!rows.length) { toast('No se encontraron clientes válidos (revisá que tengan Código y Nombre)', 'warning'); return; }
       _parsedRows = rows;
-      showPreview(rows);
+      showPreview(rows, skipped);
     };
     reader.readAsArrayBuffer(file);
   }
 
-  function showPreview(rows) {
+  function showPreview(rows, skipped = 0) {
     document.getElementById('import-summary').innerHTML = `
       <div class="import-summary-box">
         <span><i class="fas fa-users"></i> <strong>${rows.length}</strong> clientes en el archivo</span>
+        ${skipped > 0 ? `<span style="color:var(--warning)"><i class="fas fa-exclamation-triangle"></i> <strong>${skipped}</strong> fila(s) sin código/nombre se omitirán</span>` : ''}
       </div>`;
 
     document.getElementById('import-preview-table').innerHTML = `
       <table class="table table-sm table-bordered">
-        <thead><tr><th>Nombre</th><th>Tienda</th><th>RUC</th><th>Teléfono</th><th>Ciudad</th><th>Correo</th></tr></thead>
+        <thead><tr><th>Código</th><th>Nombre</th><th>Tienda</th><th>RUC</th><th>Teléfono</th><th>Ciudad</th><th>Correo</th></tr></thead>
         <tbody>
           ${rows.slice(0, 50).map(r => `<tr>
-            <td>${esc(r.name)}</td><td>${esc(r.store_name)}</td><td>${esc(r.ruc)}</td>
+            <td><strong>${r.code}</strong></td><td>${esc(r.name)}</td><td>${esc(r.store_name)}</td><td>${esc(r.ruc)}</td>
             <td>${esc(r.phone)}</td><td>${esc(r.city)}</td><td>${esc(r.email)}</td>
           </tr>`).join('')}
-          ${rows.length > 50 ? `<tr><td colspan="6" class="text-center text-muted">… y ${rows.length - 50} filas más</td></tr>` : ''}
+          ${rows.length > 50 ? `<tr><td colspan="7" class="text-center text-muted">… y ${rows.length - 50} filas más</td></tr>` : ''}
         </tbody>
       </table>`;
 
@@ -316,27 +344,26 @@ function openClientImportModal(reloadFn) {
 async function executeClientImport(rows) {
   let created = 0, updated = 0, errors = 0;
 
-  // Cargar clientes activos existentes para evitar duplicados (match por RUC o por nombre)
-  const { data: existing } = await db.from('clients').select('id, name, ruc').eq('active', true);
-  const byRuc  = {};
-  const byName = {};
-  (existing || []).forEach(c => {
-    if (c.ruc) byRuc[String(c.ruc).trim().toLowerCase()] = c.id;
-    byName[String(c.name).trim().toLowerCase()] = c.id;
-  });
+  // Cargar TODOS los clientes (activos e inactivos) indexados por código.
+  // El código es la clave: si existe, se actualiza; si no, se crea.
+  const { data: existing } = await db.from('clients').select('id, code');
+  const byCode = {};
+  (existing || []).forEach(c => { if (c.code != null) byCode[c.code] = c.id; });
 
   for (const r of rows) {
     try {
       const payload = {
+        code:       r.code,
         name:       r.name,
         store_name: r.store_name || null,
         ruc:        r.ruc   || null,
         phone:      r.phone || null,
         city:       r.city  || null,
         email:      r.email || null,
+        active:     true, // reactiva si estaba dado de baja
       };
 
-      const matchId = (r.ruc && byRuc[r.ruc.toLowerCase()]) || byName[r.name.toLowerCase()];
+      const matchId = byCode[r.code];
 
       if (matchId) {
         const { error } = await db.from('clients').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', matchId);
@@ -345,9 +372,7 @@ async function executeClientImport(rows) {
       } else {
         const { data, error } = await db.from('clients').insert(payload).select('id').single();
         if (error) throw error;
-        // registrar el nuevo para evitar duplicados dentro del mismo archivo
-        if (r.ruc) byRuc[r.ruc.toLowerCase()] = data.id;
-        byName[r.name.toLowerCase()] = data.id;
+        byCode[r.code] = data.id; // evita duplicar el mismo código dentro del archivo
         created++;
       }
     } catch {
@@ -360,13 +385,13 @@ async function executeClientImport(rows) {
 
 function downloadClientTemplate() {
   const data = [
-    ['Nombre', 'Tienda', 'RUC', 'Telefono', 'Ciudad', 'Correo'],
-    ['Juan Pérez',    'Tienda Centro',   '1234567-8', '0981 123 456', 'Asunción',     'juan@ejemplo.com'],
-    ['María Gómez',   'Boutique María',  '8765432-1', '0972 654 321', 'Ciudad del Este', 'maria@ejemplo.com'],
-    ['Carlos Benítez','Multitienda CB',  '4567890-2', '0961 555 777', 'Encarnación',  ''],
+    ['Codigo', 'Nombre', 'Tienda', 'RUC', 'Telefono', 'Ciudad', 'Correo'],
+    [1001, 'Juan Pérez',    'Tienda Centro',   '1234567-8', '0981 123 456', 'Asunción',     'juan@ejemplo.com'],
+    [1002, 'María Gómez',   'Boutique María',  '8765432-1', '0972 654 321', 'Ciudad del Este', 'maria@ejemplo.com'],
+    [1003, 'Carlos Benítez','Multitienda CB',  '4567890-2', '0961 555 777', 'Encarnación',  ''],
   ];
   const ws = window.XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [20, 20, 15, 16, 16, 24].map(w => ({ wch: w }));
+  ws['!cols'] = [10, 20, 20, 15, 16, 16, 24].map(w => ({ wch: w }));
   const wb = window.XLSX.utils.book_new();
   window.XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
   window.XLSX.writeFile(wb, 'plantilla-clientes.xlsx');

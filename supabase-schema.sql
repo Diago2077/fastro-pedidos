@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Clientes
 CREATE TABLE IF NOT EXISTS clients (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code        INTEGER,
   name        TEXT NOT NULL,
   store_name  TEXT,
   ruc         TEXT,
@@ -29,6 +30,7 @@ CREATE TABLE IF NOT EXISTS clients (
   created_at  TIMESTAMPTZ DEFAULT NOW(),
   updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS clients_code_key ON clients(code) WHERE code IS NOT NULL;
 
 -- Proveedores
 CREATE TABLE IF NOT EXISTS providers (
@@ -169,3 +171,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS can_edit_providers    BOOLEAN DEFAULT
 ALTER TABLE users ADD COLUMN IF NOT EXISTS can_delete_providers  BOOLEAN DEFAULT true;
 -- Reportes
 ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_reports      BOOLEAN DEFAULT true;
+
+-- Código numérico de cliente (único cuando no es nulo)
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS code INTEGER;
+CREATE UNIQUE INDEX IF NOT EXISTS clients_code_key ON clients(code) WHERE code IS NOT NULL;

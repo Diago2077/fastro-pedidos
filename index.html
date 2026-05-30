@@ -8,6 +8,16 @@
   <meta http-equiv="Expires" content="0">
   <title>FASTRO — Sistema de Pedidos</title>
   <link rel="icon" href="assets/favicon.png?v=2" type="image/png">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="FASTRO">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -144,6 +154,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script type="module" src="js/app.js"></script>
+
+<!-- PWA: registrar service worker -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW no registrado:', err));
+    });
+  }
+</script>
 
 </body>
 </html>

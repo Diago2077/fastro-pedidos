@@ -363,7 +363,7 @@ select.form-control { cursor: pointer; }
 .input-addon:hover { color: var(--text); }
 
 .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.form-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.form-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
 .span-2 { grid-column: span 2; }
 .span-full { grid-column: 1 / -1; }
 

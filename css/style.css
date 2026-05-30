@@ -560,6 +560,16 @@ select.form-control { cursor: pointer; }
 .modal-title { font-size: 1em; font-weight: 700; }
 .modal-body  { padding: 20px; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; }
 
+/* Botón cerrar (X) del modal: visible sobre el header blanco y táctil */
+.modal-header .icon-btn {
+  color: var(--text-muted);
+  font-size: 1.25em;
+  min-width: 40px;
+  min-height: 40px;
+  flex-shrink: 0;
+}
+.modal-header .icon-btn:hover { background: var(--bg); color: var(--text); }
+
 /* Modal como hoja a pantalla completa en celular */
 @media (max-width: 640px) {
   .modal { padding: 0; align-items: stretch; }

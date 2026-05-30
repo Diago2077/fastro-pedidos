@@ -400,12 +400,18 @@ function showProductGrid(product) {
       const v = variantMap[`${color}|||${size}`];
       if (!v) return `<td class="cell-na">–</td>`;
       const existingQty = existingQtyMap[v.id] || '';
-      const highlight   = existingQty ? 'style="width:65px;border-color:var(--accent);background:#fff8f8"' : 'style="width:65px"';
-      return `<td class="text-center"><input type="number" min="0" class="form-control form-control-sm grid-qty text-center"
-        data-variant-id="${v.id}" data-code="${esc(product.code)}" data-desc="${esc(product.description)}"
-        data-color="${esc(color)}" data-size="${esc(size)}"
-        data-sale="${v.sale_price}" data-cost="${v.cost_price}"
-        value="${existingQty}" placeholder="0" ${highlight}></td>`;
+      const inputStyle  = existingQty ? 'style="border-color:var(--accent);background:#fff8f8"' : '';
+      return `<td class="text-center">
+        <div class="qty-stepper">
+          <button type="button" class="qty-btn" data-act="dec" tabindex="-1">−</button>
+          <input type="number" min="0" class="form-control form-control-sm grid-qty text-center"
+            data-variant-id="${v.id}" data-code="${esc(product.code)}" data-desc="${esc(product.description)}"
+            data-color="${esc(color)}" data-size="${esc(size)}"
+            data-sale="${v.sale_price}" data-cost="${v.cost_price}"
+            value="${existingQty}" placeholder="0" ${inputStyle}>
+          <button type="button" class="qty-btn" data-act="inc" tabindex="-1">+</button>
+        </div>
+      </td>`;
     }).join('');
     return `<tr><td><strong>${esc(color)}</strong></td>${cells}</tr>`;
   }).join('');
@@ -430,6 +436,20 @@ function showProductGrid(product) {
     </div>`;
 
   document.getElementById('btn-close-grid')?.addEventListener('click', () => { wrap.innerHTML = ''; });
+
+  // Botones +/- por celda (delegado en la tabla recién creada, sin acumular listeners)
+  wrap.querySelector('.product-grid-table')?.addEventListener('click', e => {
+    const btn = e.target.closest('.qty-btn');
+    if (!btn) return;
+    const input = btn.parentElement.querySelector('.grid-qty');
+    if (!input) return;
+    let val = parseInt(input.value) || 0;
+    val = btn.dataset.act === 'inc' ? val + 1 : Math.max(0, val - 1);
+    input.value = val > 0 ? val : ''; // vacío en 0 para mostrar el placeholder
+    // resaltar mientras tenga cantidad
+    if (val > 0) { input.style.borderColor = 'var(--accent)'; input.style.background = '#fff8f8'; }
+    else { input.style.borderColor = ''; input.style.background = ''; }
+  });
 
   document.getElementById('btn-add-to-order')?.addEventListener('click', () => {
     const allInputs = [...wrap.querySelectorAll('.grid-qty')];

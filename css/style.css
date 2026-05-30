@@ -814,7 +814,40 @@ select.form-control { cursor: pointer; }
 .product-grid-table th { text-align: center; }
 .product-grid-table .sz-price { font-size: .75em; color: var(--accent); font-weight: 700; }
 .cell-na { text-align: center; background: var(--border-light); color: var(--text-light); }
-.grid-qty { min-width: 58px; }
+.product-grid-table.table-sm td { padding: 5px 6px; }
+
+/* Stepper de cantidad: [−] [input] [+] */
+.qty-stepper { display: flex; align-items: stretch; justify-content: center; gap: 3px; }
+.qty-stepper .grid-qty {
+  width: 42px;
+  min-width: 42px;
+  padding-left: 2px;
+  padding-right: 2px;
+  -moz-appearance: textfield;
+}
+/* ocultar flechas nativas del input number para no duplicar controles */
+.qty-stepper .grid-qty::-webkit-outer-spin-button,
+.qty-stepper .grid-qty::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.qty-btn {
+  flex-shrink: 0;
+  width: 32px;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: var(--radius);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.qty-btn:hover  { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+.qty-btn:active { transform: scale(.92); }
 
 /* Totals */
 .order-totals {

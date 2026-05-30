@@ -112,6 +112,41 @@ WHERE lower(u.email) = lower(p.email);
 
 
 -- ============================================================
+-- FASE 2-BIS — RECUPERACIÓN (correr si `profiles` quedó vacía)
+-- Pasa esto si creaste los usuarios de Auth ANTES de la Fase 1
+-- (el trigger no existía aún y no les creó el perfil).
+-- Es idempotente: podés correrlo sin miedo.
+-- ============================================================
+
+-- a) Crear el perfil para cualquier usuario de Auth que no tenga uno
+INSERT INTO profiles (id, email, name)
+SELECT u.id, u.email, COALESCE(u.raw_user_meta_data->>'name', u.email)
+FROM auth.users u
+LEFT JOIN profiles p ON p.id = u.id
+WHERE p.id IS NULL;
+
+-- b) Volver a copiar rol + permisos desde la tabla vieja `users`
+UPDATE profiles p SET
+  name=u.name, role=u.role, active=u.active,
+  can_see_cost=u.can_see_cost, can_export_excel=u.can_export_excel,
+  can_view_dashboard=u.can_view_dashboard,
+  can_view_orders=u.can_view_orders, can_create_orders=u.can_create_orders,
+  can_edit_orders=u.can_edit_orders, can_delete_orders=u.can_delete_orders,
+  can_view_clients=u.can_view_clients, can_create_clients=u.can_create_clients,
+  can_edit_clients=u.can_edit_clients, can_delete_clients=u.can_delete_clients,
+  can_view_products=u.can_view_products, can_create_products=u.can_create_products,
+  can_edit_products=u.can_edit_products, can_delete_products=u.can_delete_products,
+  can_view_providers=u.can_view_providers, can_create_providers=u.can_create_providers,
+  can_edit_providers=u.can_edit_providers, can_delete_providers=u.can_delete_providers,
+  can_view_reports=u.can_view_reports, updated_at=NOW()
+FROM users u
+WHERE lower(u.email) = lower(p.email);
+
+-- c) Verificar: debe listar los 3 (Diago/Veronica admin, Sandra user)
+SELECT email, role, active FROM profiles ORDER BY role, email;
+
+
+-- ============================================================
 -- FASE 4 — Activar RLS (correr SOLO cuando el código nuevo ya esté en vivo
 -- y el login con Supabase Auth funcione)
 -- ============================================================

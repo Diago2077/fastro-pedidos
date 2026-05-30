@@ -14,6 +14,16 @@ const STATUS_LABELS = { open: 'Abierto', sent: 'Enviado', closed: 'Cerrado' };
 function nextStatus(s) { return { open: 'closed', closed: 'sent', sent: 'open' }[s] || 'open'; }
 function todayISO() { return new Date().toISOString().split('T')[0]; }
 
+// Etiqueta de cliente: "1024 — Juan Pérez (Tienda Centro)"
+function clientLabel(c) {
+  if (!c) return '';
+  const code  = c.code != null ? `${c.code} — ` : '';
+  const store = c.store_name ? ` (${c.store_name})` : '';
+  return `${code}${c.name}${store}`;
+}
+// Normaliza texto para buscar (minúsculas, sin tildes)
+function normTxt(s) { return String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+
 export async function renderOrders(container) {
   container.innerHTML = `
     <div class="card">
@@ -120,7 +130,7 @@ async function openOrderModal(orderId, onSavedFn) {
 
   // Parallel data fetch
   const [clientsRes, provsRes, cfgRes] = await Promise.all([
-    db.from('clients').select('id, name').eq('active', true).order('name'),
+    db.from('clients').select('id, code, name, store_name').eq('active', true).order('name'),
     db.from('providers').select('id, name').eq('active', true).order('name'),
     db.from('app_config').select('key, value')
   ]);
@@ -157,6 +167,44 @@ async function openOrderModal(orderId, onSavedFn) {
   // Render items table
   renderItemsTable();
   updateTotals();
+
+  // Client search autocomplete (busca por código, nombre o tienda)
+  const clientSearch  = document.getElementById('client-search');
+  const clientResults = document.getElementById('client-results');
+  const clientIdVal   = document.getElementById('client-id-val');
+
+  function renderClientResults(list) {
+    if (!list.length) {
+      clientResults.innerHTML = '<div class="sr-item text-muted">Sin resultados</div>';
+    } else {
+      clientResults.innerHTML = list.slice(0, 20).map(c =>
+        `<div class="sr-item" data-id="${c.id}">${esc(clientLabel(c))}</div>`).join('');
+    }
+    clientResults.classList.remove('hidden');
+  }
+
+  clientSearch?.addEventListener('input', () => {
+    clientIdVal.value = ''; // al editar el texto se anula la selección previa
+    const q = normTxt(clientSearch.value.trim());
+    if (!q) { clientResults.classList.add('hidden'); return; }
+    const matches = clients.filter(c => normTxt(`${c.code ?? ''} ${c.name} ${c.store_name ?? ''}`).includes(q));
+    renderClientResults(matches);
+  });
+
+  clientSearch?.addEventListener('focus', () => {
+    if (!clientIdVal.value && clientSearch.value.trim()) clientSearch.dispatchEvent(new Event('input'));
+  });
+
+  clientResults?.addEventListener('click', e => {
+    const item = e.target.closest('.sr-item[data-id]');
+    if (!item) return;
+    const c = clients.find(x => x.id === item.dataset.id);
+    if (c) { clientIdVal.value = c.id; clientSearch.value = clientLabel(c); }
+    clientResults.classList.add('hidden');
+  });
+
+  // Ocultar resultados al perder foco (con delay para que registre el click)
+  clientSearch?.addEventListener('blur', () => setTimeout(() => clientResults?.classList.add('hidden'), 150));
 
   // Product search autocomplete
   const searchInput = document.getElementById('prod-search');
@@ -236,8 +284,8 @@ async function openOrderModal(orderId, onSavedFn) {
 }
 
 function buildOrderFormHTML(order, clients, providers, orderId) {
-  const clientOpts   = clients.map(c => `<option value="${c.id}" ${order.client_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   const providerOpts = providers.map(p => `<option value="${p.id}" ${order.provider_id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+  const selectedClient = clients.find(c => c.id === order.client_id);
 
   return `
   <form id="order-form">
@@ -245,12 +293,15 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
     <div class="order-header-grid">
       ${orderId ? `<div class="form-group"><label class="form-label">N° Pedido</label>
         <input class="form-control" value="${esc(order.order_number || '')}" readonly></div>` : ''}
-      <div class="form-group">
+      <div class="form-group" id="client-search-wrap" style="position:relative">
         <label class="form-label req">Cliente</label>
-        <select name="client_id" class="form-control" required>
-          <option value="">— Seleccionar —</option>
-          ${clientOpts}
-        </select>
+        <input type="hidden" name="client_id" id="client-id-val" value="${order.client_id || ''}">
+        <div class="search-box">
+          <i class="fas fa-search"></i>
+          <input type="text" id="client-search" class="form-control" autocomplete="off"
+            placeholder="Buscar por código, nombre o tienda…" value="${esc(clientLabel(selectedClient))}">
+        </div>
+        <div id="client-results" class="search-results hidden"></div>
       </div>
       <div class="form-group">
         <label class="form-label req">Proveedor</label>
@@ -483,6 +534,15 @@ async function saveOrder(originalOrder, orderId, onSavedFn) {
   setLoading(btn, true);
 
   const fd = new FormData(form);
+
+  // El cliente se elige con un buscador (input oculto), así que validamos manualmente
+  if (!fd.get('client_id')) {
+    setLoading(btn, false);
+    toast('Seleccioná un cliente de la lista', 'warning');
+    document.getElementById('client-search')?.focus();
+    return;
+  }
+
   const payload = {
     client_id:    fd.get('client_id')    || null,
     provider_id:  fd.get('provider_id')  || null,

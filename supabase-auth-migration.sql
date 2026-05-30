@@ -107,10 +107,7 @@ UPDATE profiles p SET
 FROM users u
 WHERE lower(u.email) = lower(p.email);
 
--- Asegurar que el admin quede como admin (por si el email difiere)
-UPDATE profiles SET role = 'admin' WHERE lower(email) = 'admin@fastro.com';
-
--- Verificación rápida
+-- Verificación rápida (debería mostrar Diago y Veronica como admin, Sandra como user)
 -- SELECT email, role, active FROM profiles ORDER BY role, email;
 
 

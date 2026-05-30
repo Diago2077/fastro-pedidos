@@ -32,7 +32,7 @@ async function loadReport(type) {
 
   // Load orders with items
   const { data: orders } = await db.from('orders')
-    .select('id, order_number, status, season, discount_pct, created_at, clients(name, city), users(name)');
+    .select('id, order_number, status, season, discount_pct, created_at, clients(name, city), users:profiles(name)');
   const { data: items } = await db.from('order_items')
     .select('order_id, quantity, unit_sale_price, unit_cost_price, product_variants(size, color, products(code, description))');
 

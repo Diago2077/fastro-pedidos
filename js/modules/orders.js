@@ -47,7 +47,7 @@ export async function renderOrders(container) {
 
   async function load(q = '', status = '') {
     let query = db.from('orders')
-      .select('id, order_number, status, season, discount_pct, created_at, shipping_date, clients(name), users(name), providers(name)')
+      .select('id, order_number, status, season, discount_pct, created_at, shipping_date, clients(name), users:profiles(name), providers(name)')
       .order('created_at', { ascending: false });
     if (q) query = query.or(`order_number.ilike.%${q}%`);
     if (status) query = query.eq('status', status);
@@ -625,7 +625,7 @@ function fGs(n) {
 
 export async function exportOrderPDF(orderId) {
   const { data: order } = await db.from('orders')
-    .select('*, clients(*), users(name)')
+    .select('*, clients(*), users:profiles(name)')
     .eq('id', orderId).single();
   const { data: items } = await db.from('order_items')
     .select('quantity, unit_sale_price, unit_cost_price, product_variants(color, size, products(code, description))')
@@ -692,7 +692,7 @@ export async function exportOrderPDF(orderId) {
 
 export async function exportOrderExcel(orderId) {
   const { data: order } = await db.from('orders')
-    .select('*, clients(*), users(name), providers(name)')
+    .select('*, clients(*), users:profiles(name), providers(name)')
     .eq('id', orderId).single();
   const { data: items } = await db.from('order_items')
     .select('quantity, unit_sale_price, unit_cost_price, product_variants(color, size, products(code, description))')

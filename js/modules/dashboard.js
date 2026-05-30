@@ -46,7 +46,7 @@ export async function renderDashboard(container) {
 
   // Load all data in parallel
   const [ordersRes, itemsRes, prodsRes] = await Promise.all([
-    db.from('orders').select('id, order_number, status, discount_pct, season, created_at, clients(name), users(name)'),
+    db.from('orders').select('id, order_number, status, discount_pct, season, created_at, clients(name), users:profiles(name)'),
     db.from('order_items').select('order_id, quantity, unit_sale_price'),
     db.from('products').select('id', { count: 'exact', head: true }).eq('active', true)
   ]);

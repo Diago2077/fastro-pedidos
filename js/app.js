@@ -117,8 +117,9 @@ function showApp(user) {
     });
   });
 
-  // Sidebar mobile toggle
+  // Drawer toggle (hamburguesa del header + botón "Más" de la barra inferior)
   document.getElementById('sidebar-open')?.addEventListener('click', openSidebarMobile);
+  document.getElementById('bottom-more')?.addEventListener('click', openSidebarMobile);
   document.getElementById('sidebar-close')?.addEventListener('click', closeSidebarMobile);
   document.getElementById('sidebar-overlay')?.addEventListener('click', closeSidebarMobile);
 
@@ -158,10 +159,14 @@ function navigate(section) {
   // Update URL hash (no scroll)
   history.replaceState(null, '', '#' + section);
 
-  // Update active nav link
+  // Update active nav link (sidebar + barra inferior comparten clase)
   document.querySelectorAll('.nav-link[data-section]').forEach(l => {
     l.classList.toggle('active', l.dataset.section === section);
   });
+
+  // Resaltar "Más" cuando la sección actual no es uno de los tabs inferiores
+  const bottomSections = [...document.querySelectorAll('.bottom-nav-link[data-section]')].map(l => l.dataset.section);
+  document.getElementById('bottom-more')?.classList.toggle('active', !bottomSections.includes(section));
 
   // Update page title
   document.getElementById('page-title').textContent = sections[section].title;

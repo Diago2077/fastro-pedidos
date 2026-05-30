@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -53,7 +53,7 @@
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-brand">
       <img src="assets/logo.png" alt="FASTRO" class="sidebar-logo">
-      <button id="sidebar-close" class="icon-btn d-lg-none"><i class="fas fa-times"></i></button>
+      <button id="sidebar-close" class="icon-btn sidebar-close-btn"><i class="fas fa-times"></i></button>
     </div>
 
     <nav class="sidebar-nav">
@@ -110,6 +110,15 @@
     </header>
     <main id="content-area" class="content-area"></main>
   </div>
+
+  <!-- BOTTOM NAV (mobile/tablet) -->
+  <nav class="bottom-nav">
+    <a class="bottom-nav-link nav-link" data-section="dashboard"><i class="fas fa-tachometer-alt"></i><span>Inicio</span></a>
+    <a class="bottom-nav-link nav-link" data-section="orders"><i class="fas fa-file-invoice"></i><span>Pedidos</span></a>
+    <a class="bottom-nav-link nav-link" data-section="products"><i class="fas fa-boxes"></i><span>Productos</span></a>
+    <a class="bottom-nav-link nav-link" data-section="clients"><i class="fas fa-store"></i><span>Clientes</span></a>
+    <button class="bottom-nav-link" id="bottom-more" type="button"><i class="fas fa-ellipsis-h"></i><span>Más</span></button>
+  </nav>
 
 </div>
 

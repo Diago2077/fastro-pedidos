@@ -38,7 +38,7 @@ export async function renderDashboard(container) {
 
     <div class="charts-grid">
       <div class="card">
-        <div class="card-header"><h5 class="card-title">Ventas por Vendedor</h5></div>
+        <div class="card-header"><h5 class="card-title" id="ch-sellers-title">Ventas por Vendedor</h5></div>
         <div class="card-body chart-wrap"><canvas id="ch-sellers"></canvas></div>
       </div>
       <div class="card">
@@ -53,13 +53,15 @@ export async function renderDashboard(container) {
     </div>`;
 
   // Load data in parallel
-  const [ordersRes, itemsRes] = await Promise.all([
+  const [ordersRes, itemsRes, cfgRes] = await Promise.all([
     db.from('orders').select('id, order_number, status, discount_pct, season, created_at, clients(name), users:profiles(name)'),
-    db.from('order_items').select('order_id, quantity, unit_sale_price, unit_cost_price')
+    db.from('order_items').select('order_id, quantity, unit_sale_price, unit_cost_price'),
+    db.from('app_config').select('value').eq('key', 'current_season').maybeSingle()
   ]);
 
   const orders = ordersRes.data || [];
   const items  = itemsRes.data  || [];
+  const currentSeason = (cfgRes.data?.value || '').trim();
 
   // Revenue & cost by order
   const revByOrder = {};
@@ -81,9 +83,13 @@ export async function renderDashboard(container) {
   document.getElementById('s-closed').textContent = orders.filter(o => o.status === 'closed').length;
   document.getElementById('s-sent').textContent   = orders.filter(o => o.status === 'sent').length;
 
-  // Chart: ventas por vendedor (participación)
+  // Chart: ventas por vendedor — solo la temporada actual (de Configuración)
+  const titleEl = document.getElementById('ch-sellers-title');
+  if (titleEl) titleEl.textContent = currentSeason ? `Ventas por Vendedor — ${currentSeason}` : 'Ventas por Vendedor';
+
+  const sellerOrders = currentSeason ? orders.filter(o => (o.season || '').trim() === currentSeason) : orders;
   const bySeller = {};
-  orders.forEach(o => {
+  sellerOrders.forEach(o => {
     const s = o.users?.name || 'Sin asignar';
     bySeller[s] = (bySeller[s] || 0) + (revByOrder[o.id] || 0) * (1 - (o.discount_pct || 0) / 100);
   });

@@ -1,5 +1,6 @@
 import { db } from '../supabase.js';
 import { fCurrency, fDate } from '../utils/helpers.js';
+import { canSeeCost } from '../auth.js';
 
 const charts = {};
 
@@ -8,30 +9,37 @@ function destroyChart(id) {
 }
 
 export async function renderDashboard(container) {
+  const _canCost = canSeeCost();
+
   container.innerHTML = `
     <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon si-red"><i class="fas fa-dollar-sign"></i></div>
+        <div><div class="stat-value" id="s-rev">–</div><div class="stat-label">Ventas Totales</div></div>
+      </div>
+      ${_canCost ? `
+      <div class="stat-card">
+        <div class="stat-icon si-dark"><i class="fas fa-money-bill-wave"></i></div>
+        <div><div class="stat-value" id="s-cost">–</div><div class="stat-label">Total Ventas en Costo</div></div>
+      </div>` : ''}
       <div class="stat-card">
         <div class="stat-icon si-blue"><i class="fas fa-file-invoice"></i></div>
         <div><div class="stat-value" id="s-open">–</div><div class="stat-label">Pedidos Abiertos</div></div>
       </div>
       <div class="stat-card">
+        <div class="stat-icon si-orange"><i class="fas fa-clipboard-check"></i></div>
+        <div><div class="stat-value" id="s-closed">–</div><div class="stat-label">Pedidos Cerrados</div></div>
+      </div>
+      <div class="stat-card">
         <div class="stat-icon si-green"><i class="fas fa-shipping-fast"></i></div>
         <div><div class="stat-value" id="s-sent">–</div><div class="stat-label">Pedidos Enviados</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon si-red"><i class="fas fa-dollar-sign"></i></div>
-        <div><div class="stat-value" id="s-rev">–</div><div class="stat-label">Ventas Totales</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon si-orange"><i class="fas fa-boxes"></i></div>
-        <div><div class="stat-value" id="s-prods">–</div><div class="stat-label">Productos Activos</div></div>
       </div>
     </div>
 
     <div class="charts-grid">
       <div class="card">
-        <div class="card-header"><h5 class="card-title">Pedidos por Estado</h5></div>
-        <div class="card-body chart-wrap"><canvas id="ch-status"></canvas></div>
+        <div class="card-header"><h5 class="card-title">Ventas por Vendedor</h5></div>
+        <div class="card-body chart-wrap"><canvas id="ch-sellers"></canvas></div>
       </div>
       <div class="card">
         <div class="card-header"><h5 class="card-title">Ventas por Temporada</h5></div>
@@ -44,48 +52,56 @@ export async function renderDashboard(container) {
       <div class="table-responsive" id="recent-tbl"></div>
     </div>`;
 
-  // Load all data in parallel
-  const [ordersRes, itemsRes, prodsRes] = await Promise.all([
+  // Load data in parallel
+  const [ordersRes, itemsRes] = await Promise.all([
     db.from('orders').select('id, order_number, status, discount_pct, season, created_at, clients(name), users:profiles(name)'),
-    db.from('order_items').select('order_id, quantity, unit_sale_price'),
-    db.from('products').select('id', { count: 'exact', head: true }).eq('active', true)
+    db.from('order_items').select('order_id, quantity, unit_sale_price, unit_cost_price')
   ]);
 
   const orders = ordersRes.data || [];
   const items  = itemsRes.data  || [];
-  const prodCount = prodsRes.count || 0;
 
-  // Revenue by order
+  // Revenue & cost by order
   const revByOrder = {};
-  items.forEach(i => { revByOrder[i.order_id] = (revByOrder[i.order_id] || 0) + i.quantity * i.unit_sale_price; });
+  const costByOrder = {};
+  items.forEach(i => {
+    revByOrder[i.order_id]  = (revByOrder[i.order_id]  || 0) + i.quantity * i.unit_sale_price;
+    costByOrder[i.order_id] = (costByOrder[i.order_id] || 0) + i.quantity * i.unit_cost_price;
+  });
 
-  let totalRev = 0;
-  orders.forEach(o => { totalRev += (revByOrder[o.id] || 0) * (1 - (o.discount_pct || 0) / 100); });
+  let totalRev = 0, totalCost = 0;
+  orders.forEach(o => {
+    totalRev  += (revByOrder[o.id]  || 0) * (1 - (o.discount_pct || 0) / 100);
+    totalCost += (costByOrder[o.id] || 0); // el costo no lleva descuento
+  });
 
-  document.getElementById('s-open').textContent  = orders.filter(o => o.status === 'open').length;
-  document.getElementById('s-sent').textContent  = orders.filter(o => o.status === 'sent').length;
-  document.getElementById('s-rev').textContent   = fCurrency(totalRev);
-  document.getElementById('s-prods').textContent = prodCount;
+  document.getElementById('s-rev').textContent    = fCurrency(totalRev);
+  if (_canCost) document.getElementById('s-cost').textContent = fCurrency(totalCost);
+  document.getElementById('s-open').textContent   = orders.filter(o => o.status === 'open').length;
+  document.getElementById('s-closed').textContent = orders.filter(o => o.status === 'closed').length;
+  document.getElementById('s-sent').textContent   = orders.filter(o => o.status === 'sent').length;
 
-  // Chart: status
-  destroyChart('ch-status');
-  const ctx1 = document.getElementById('ch-status')?.getContext('2d');
+  // Chart: ventas por vendedor (participación)
+  const bySeller = {};
+  orders.forEach(o => {
+    const s = o.users?.name || 'Sin asignar';
+    bySeller[s] = (bySeller[s] || 0) + (revByOrder[o.id] || 0) * (1 - (o.discount_pct || 0) / 100);
+  });
+  const sellerColors = ['#9B0000', '#1a1a1a', '#3182ce', '#38a169', '#d69e2e', '#805ad5', '#dd6b20'];
+  destroyChart('ch-sellers');
+  const ctx1 = document.getElementById('ch-sellers')?.getContext('2d');
   if (ctx1) {
-    charts['ch-status'] = new window.Chart(ctx1, {
+    charts['ch-sellers'] = new window.Chart(ctx1, {
       type: 'doughnut',
       data: {
-        labels: ['Abiertos', 'Cerrados', 'Enviados'],
-        datasets: [{ data: [
-          orders.filter(o => o.status === 'open').length,
-          orders.filter(o => o.status === 'closed').length,
-          orders.filter(o => o.status === 'sent').length
-        ], backgroundColor: ['#3182ce', '#d69e2e', '#38a169'], borderWidth: 3, borderColor: '#fff' }]
+        labels: Object.keys(bySeller),
+        datasets: [{ data: Object.values(bySeller), backgroundColor: sellerColors, borderWidth: 3, borderColor: '#fff' }]
       },
-      options: { plugins: { legend: { position: 'bottom' } }, cutout: '68%', responsive: true }
+      options: { plugins: { legend: { position: 'bottom' } }, cutout: '60%', responsive: true }
     });
   }
 
-  // Chart: sales by season
+  // Chart: ventas por temporada
   const bySeason = {};
   orders.forEach(o => {
     const s = o.season || 'Sin temporada';
@@ -98,12 +114,12 @@ export async function renderDashboard(container) {
       type: 'bar',
       data: {
         labels: Object.keys(bySeason),
-        datasets: [{ label: 'Ventas ($)', data: Object.values(bySeason), backgroundColor: '#9B0000', borderRadius: 5 }]
+        datasets: [{ label: 'Ventas', data: Object.values(bySeason), backgroundColor: '#9B0000', borderRadius: 5 }]
       },
       options: {
         responsive: true,
         plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString('es-EC') } } }
+        scales: { y: { beginAtZero: true, ticks: { callback: v => '₲ ' + v.toLocaleString('es-PY') } } }
       }
     });
   }

@@ -737,6 +737,7 @@ select.form-control { cursor: pointer; }
 .si-blue   { background: var(--info); }
 .si-green  { background: var(--success); }
 .si-orange { background: var(--warning); }
+.si-dark   { background: #2d3748; }
 
 .stat-value { font-size: 1.6em; font-weight: 700; line-height: 1.2; }
 .stat-label { font-size: .8em; color: var(--text-muted); margin-top: 2px; }

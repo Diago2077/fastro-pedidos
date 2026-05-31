@@ -28,21 +28,26 @@ export async function renderOrders(container) {
   container.innerHTML = `
     <div class="card">
       <div class="card-header">
-        <div class="card-actions">
-          <div class="search-box">
-            <i class="fas fa-search"></i>
-            <input type="text" id="q-ord" placeholder="Buscar por N° o cliente…" class="form-control">
+        <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+          <div class="card-actions">
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" id="q-ord" placeholder="Buscar por N° o cliente…" class="form-control">
+            </div>
+            <button id="btn-toggle-filters" type="button" class="btn btn-sm btn-outline"><i class="fas fa-filter"></i> Filtro</button>
+            ${canCreateOrders() ? `<button class="btn btn-accent" onclick="window._ord.new()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
           </div>
-          <select id="filter-client" class="form-control form-control-sm" style="width:auto"><option value="">Todos los clientes</option></select>
-          <select id="filter-seller" class="form-control form-control-sm" style="width:auto"><option value="">Todos los vendedores</option></select>
-          <select id="filter-season" class="form-control form-control-sm" style="width:auto"><option value="">Todas las temporadas</option></select>
-          <select id="filter-status" class="form-control form-control-sm" style="width:auto">
-            <option value="">Todos los estados</option>
-            <option value="open">Abiertos</option>
-            <option value="closed">Cerrados</option>
-            <option value="sent">Enviados</option>
-          </select>
-          ${canCreateOrders() ? `<button class="btn btn-accent" onclick="window._ord.new()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
+          <div id="ord-filters" class="card-actions hidden">
+            <select id="filter-client" class="form-control form-control-sm" style="width:auto"><option value="">Todos los clientes</option></select>
+            <select id="filter-seller" class="form-control form-control-sm" style="width:auto"><option value="">Todos los vendedores</option></select>
+            <select id="filter-season" class="form-control form-control-sm" style="width:auto"><option value="">Todas las temporadas</option></select>
+            <select id="filter-status" class="form-control form-control-sm" style="width:auto">
+              <option value="">Todos los estados</option>
+              <option value="open">Abiertos</option>
+              <option value="closed">Cerrados</option>
+              <option value="sent">Enviados</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="table-responsive" id="ord-tbl"></div>
@@ -102,6 +107,15 @@ export async function renderOrders(container) {
     if (seller) rows = rows.filter(o => o.users?.id === seller);
     if (season) rows = rows.filter(o => (o.season || '') === season);
 
+    // Indicador de filtros activos en el botón
+    const active = [status, client, seller, season].filter(Boolean).length;
+    const fbtn = document.getElementById('btn-toggle-filters');
+    if (fbtn) {
+      fbtn.innerHTML = `<i class="fas fa-filter"></i> Filtro${active ? ` (${active})` : ''}`;
+      fbtn.classList.toggle('btn-accent', active > 0);
+      fbtn.classList.toggle('btn-outline', active === 0);
+    }
+
     render(rows, _totByOrder);
   }
 
@@ -154,6 +168,9 @@ export async function renderOrders(container) {
     }
   });
 
+  document.getElementById('btn-toggle-filters')?.addEventListener('click', () => {
+    document.getElementById('ord-filters')?.classList.toggle('hidden');
+  });
   document.getElementById('q-ord')?.addEventListener('input', debounce(applyFilters, 250));
   ['filter-status', 'filter-client', 'filter-seller', 'filter-season'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', applyFilters);

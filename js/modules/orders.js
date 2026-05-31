@@ -39,7 +39,7 @@ export async function renderOrders(container) {
             <option value="closed">Cerrados</option>
             <option value="sent">Enviados</option>
           </select>
-          ${canCreateOrders() ? `<button class="btn btn-accent" onclick="window._ord.new()"><i class="fas fa-plus"></i> Nuevo Pedido</button>` : ''}
+          ${canCreateOrders() ? `<button class="btn btn-accent" onclick="window._ord.new()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="ord-tbl"></div>

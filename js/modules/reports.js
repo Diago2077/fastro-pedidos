@@ -150,6 +150,7 @@ function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
     map[s].cost    += cost;
   });
   const rows = Object.values(map).sort((a, b) => b.revenue - a.revenue);
+  const totalRevenue = rows.reduce((acc, r) => acc + r.revenue, 0);
 
   el.innerHTML = `
     <div class="charts-grid mt-3">
@@ -168,17 +169,17 @@ function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
       </div>
       <div class="table-responsive">
         <table class="table table-hover">
-          <thead><tr><th>Vendedor</th><th class="text-end">Pedidos</th><th class="text-end">Unidades</th><th class="text-end">Ventas</th>${showCost ? '<th class="text-end">Costo</th><th class="text-end">Margen</th>' : ''}</tr></thead>
+          <thead><tr><th>Vendedor</th><th class="text-end">Pedidos</th><th class="text-end">Unidades</th><th class="text-end">Ventas</th>${showCost ? '<th class="text-end">Costo</th>' : ''}<th class="text-end">% Ventas</th></tr></thead>
           <tbody>
             ${rows.map(r => {
-              const margin = r.revenue > 0 ? ((r.revenue - r.cost) / r.revenue * 100) : 0;
+              const pct = totalRevenue > 0 ? (r.revenue / totalRevenue * 100) : 0;
               return `<tr>
                 <td><strong>${r.seller}</strong></td>
                 <td class="text-end">${r.orders}</td>
                 <td class="text-end">${fNum(r.qty)}</td>
                 <td class="text-end">${fCurrency(r.revenue)}</td>
-                ${showCost ? `<td class="text-end">${fCurrency(r.cost)}</td>
-                <td class="text-end"><span class="badge ${margin > 30 ? 'badge-success' : 'badge-warning'}">${margin.toFixed(1)}%</span></td>` : ''}
+                ${showCost ? `<td class="text-end">${fCurrency(r.cost)}</td>` : ''}
+                <td class="text-end"><span class="badge badge-info">${pct.toFixed(1)}%</span></td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -212,7 +213,8 @@ function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
     { key: 'orders',  header: 'Pedidos' },
     { key: 'qty',     header: 'Unidades' },
     { key: 'revenue', header: 'Ventas', format: v => fCurrency(v) },
-    ...(showCost ? [{ key: 'cost', header: 'Costo', format: v => fCurrency(v) }] : [])
+    ...(showCost ? [{ key: 'cost', header: 'Costo', format: v => fCurrency(v) }] : []),
+    { key: 'revenue', header: '% Ventas', format: v => (totalRevenue > 0 ? (v / totalRevenue * 100) : 0).toFixed(1) + '%' }
   ];
   document.getElementById('rpt-v-pdf')?.addEventListener('click', () => exportPDF('Ventas por Vendedor', COLS, rows, 'ventas-vendedor.pdf'));
   document.getElementById('rpt-v-xls')?.addEventListener('click', () => exportExcel('Vendedor', COLS, rows, 'ventas-vendedor.xlsx'));

@@ -175,6 +175,16 @@ CREATE POLICY profiles_admin_write ON profiles FOR ALL    TO authenticated USING
 
 
 -- ============================================================
+-- FASE 4-BIS — Endurecer funciones SECURITY DEFINER (quita warnings)
+-- ============================================================
+-- handle_new_user: solo la usa el trigger; nadie debe ejecutarla directo
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
+-- is_admin: la necesita la RLS para usuarios autenticados; nadie más
+REVOKE EXECUTE ON FUNCTION public.is_admin() FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+
+
+-- ============================================================
 -- FASE 5 — Limpieza: eliminar la tabla vieja `users`
 -- La app ya no la usa (todo va por `profiles`). Mientras exista con RLS
 -- apagado, queda expuesta (incluye hashes de contraseña) y el Security

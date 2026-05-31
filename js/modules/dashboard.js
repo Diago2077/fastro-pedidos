@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { fCurrency, fDate } from '../utils/helpers.js';
+import { fCurrency, fDate, enableTableSort } from '../utils/helpers.js';
 import { canSeeCost } from '../auth.js';
 
 const charts = {};
@@ -159,4 +159,5 @@ export async function renderDashboard(container) {
       }).join('')}
     </tbody>
   </table>`;
+  enableTableSort(tbl.querySelector('table'));
 }

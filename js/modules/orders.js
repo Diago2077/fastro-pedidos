@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, fCurrency, fDate, statusBadge, esc } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, fCurrency, fDate, statusBadge, esc, enableTableSort } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { getSession, canExportExcel, canCreateOrders, canEditOrders, canDeleteOrders } from '../auth.js';
 
@@ -146,6 +146,7 @@ export async function renderOrders(container) {
         }).join('')}
       </tbody>
     </table>`;
+    enableTableSort(el.querySelector('table'));
   }
 
   // Use Object.assign so updateQty / removeItem defined at module level are not overwritten

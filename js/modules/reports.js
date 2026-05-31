@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { fCurrency, fNum } from '../utils/helpers.js';
+import { fCurrency, fNum, enableTableSort } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canSeeCost, canExportExcel } from '../auth.js';
 
@@ -100,6 +100,7 @@ function renderSeasonReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
         </table>
       </div>
     </div>`;
+  enableTableSort(el.querySelector('table'));
 
   // Bar chart
   destroyChart('rpt-season-bar');
@@ -184,6 +185,7 @@ function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
         </table>
       </div>
     </div>`;
+  enableTableSort(el.querySelector('table'));
 
   const colors = ['#9B0000','#1a1a1a','#3182ce','#38a169','#d69e2e','#805ad5','#dd6b20'];
 

@@ -466,6 +466,11 @@ select.form-control { cursor: pointer; }
 
 .td-actions { text-align: right; white-space: nowrap; display: flex; gap: 4px; justify-content: flex-end; }
 
+/* Encabezados ordenables */
+.sortable-th { cursor: pointer; user-select: none; }
+.sortable-th:hover { color: var(--text); }
+.sort-arrow { color: var(--accent); font-size: .85em; }
+
 /* ============================================================
    BADGES
    ============================================================ */

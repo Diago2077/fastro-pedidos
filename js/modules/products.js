@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc, fCurrency } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc, fCurrency, enableTableSort } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canSeeCost, canCreateProducts, canEditProducts, canDeleteProducts, canExportExcel } from '../auth.js';
 
@@ -15,27 +15,83 @@ export async function renderProducts(container) {
   container.innerHTML = `
     <div class="card">
       <div class="card-header">
-        <div class="card-actions">
-          <div class="search-box">
-            <i class="fas fa-search"></i>
-            <input type="text" id="q-prod" placeholder="Buscar por código o descripción…" class="form-control">
+        <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+          <div class="card-actions">
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" id="q-prod" placeholder="Buscar por código o descripción…" class="form-control">
+            </div>
+            <button id="btn-toggle-prod-filters" type="button" class="btn btn-sm btn-outline"><i class="fas fa-filter"></i> Filtro</button>
+            <button class="btn btn-sm btn-outline" title="Exportar PDF" onclick="window._pr.pdf()"><i class="fas fa-file-pdf"></i></button>
+            ${_canXls    ? `<button class="btn btn-sm btn-outline" title="Exportar Excel" onclick="window._pr.xls()"><i class="fas fa-file-excel"></i></button>` : ''}
+            ${_canCreate ? `<button class="btn btn-sm btn-outline" onclick="window._pr.importExcel()"><i class="fas fa-file-upload"></i> Importar</button>` : ''}
+            ${_canCreate ? `<button class="btn btn-accent" onclick="window._pr.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
           </div>
-          <button class="btn btn-sm btn-outline" title="Exportar PDF" onclick="window._pr.pdf()"><i class="fas fa-file-pdf"></i></button>
-          ${_canXls    ? `<button class="btn btn-sm btn-outline" title="Exportar Excel" onclick="window._pr.xls()"><i class="fas fa-file-excel"></i></button>` : ''}
-          ${_canCreate ? `<button class="btn btn-sm btn-outline" onclick="window._pr.importExcel()"><i class="fas fa-file-upload"></i> Importar</button>` : ''}
-          ${_canCreate ? `<button class="btn btn-accent" onclick="window._pr.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
+          <div id="prod-filters" class="card-actions hidden">
+            <select id="pf-brand" class="form-control form-control-sm" style="width:auto"><option value="">Todas las marcas</option></select>
+            <select id="pf-provider" class="form-control form-control-sm" style="width:auto"><option value="">Todos los proveedores</option></select>
+            <select id="pf-season" class="form-control form-control-sm" style="width:auto"><option value="">Todas las temporadas</option></select>
+          </div>
         </div>
       </div>
       <div class="table-responsive" id="pr-tbl"></div>
     </div>`;
 
-  async function load(q = '') {
-    let query = db.from('products').select('*, providers(name), product_variants(id, color, size, sale_price, cost_price)').eq('active', true).order('code');
-    if (q) query = query.or(`code.ilike.%${q}%,description.ilike.%${q}%`);
-    const { data, error } = await query;
+  const normTxt = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+  async function load() {
+    const { data, error } = await db.from('products')
+      .select('*, providers(name), product_variants(id, color, size, sale_price, cost_price)')
+      .eq('active', true).order('code');
     if (error) { toast('Error al cargar productos', 'error'); return; }
     _all = data || [];
-    render(_all);
+    populateFilters();
+    applyFilters();
+  }
+
+  function populateFilters() {
+    const brands = new Set(), provs = new Map(), seasons = new Set();
+    _all.forEach(p => {
+      if (p.brand) brands.add(p.brand);
+      if (p.provider_id && p.providers?.name) provs.set(p.provider_id, p.providers.name);
+      if (p.season) seasons.add(p.season);
+    });
+    fillSel('pf-brand', [...brands].sort().map(b => [b, b]), 'Todas las marcas');
+    fillSel('pf-provider', [...provs.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])), 'Todos los proveedores');
+    fillSel('pf-season', [...seasons].sort().map(s => [s, s]), 'Todas las temporadas');
+  }
+
+  function fillSel(id, entries, placeholder) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = `<option value="">${placeholder}</option>` +
+      entries.map(([val, label]) => `<option value="${esc(String(val))}">${esc(label)}</option>`).join('');
+    if ([...sel.options].some(o => o.value === current)) sel.value = current;
+  }
+
+  function applyFilters() {
+    const q       = normTxt(document.getElementById('q-prod')?.value.trim() || '');
+    const brand   = document.getElementById('pf-brand')?.value || '';
+    const provider= document.getElementById('pf-provider')?.value || '';
+    const season  = document.getElementById('pf-season')?.value || '';
+
+    let rows = _all;
+    if (q)        rows = rows.filter(p => normTxt(p.code).includes(q) || normTxt(p.description).includes(q));
+    if (brand)    rows = rows.filter(p => (p.brand || '') === brand);
+    if (provider) rows = rows.filter(p => p.provider_id === provider);
+    if (season)   rows = rows.filter(p => (p.season || '') === season);
+
+    // Indicador de filtros activos
+    const active = [brand, provider, season].filter(Boolean).length;
+    const fbtn = document.getElementById('btn-toggle-prod-filters');
+    if (fbtn) {
+      fbtn.innerHTML = `<i class="fas fa-filter"></i> Filtro${active ? ` (${active})` : ''}`;
+      fbtn.classList.toggle('btn-accent', active > 0);
+      fbtn.classList.toggle('btn-outline', active === 0);
+    }
+
+    render(rows);
   }
 
   function render(rows) {
@@ -82,6 +138,7 @@ export async function renderProducts(container) {
         }).join('')}
       </tbody>
     </table>`;
+    enableTableSort(el.querySelector('table'));
   }
 
   window._pr = {
@@ -137,7 +194,13 @@ export async function renderProducts(container) {
     downloadTemplate
   };
 
-  document.getElementById('q-prod')?.addEventListener('input', debounce(e => load(e.target.value.trim()), 300));
+  document.getElementById('btn-toggle-prod-filters')?.addEventListener('click', () => {
+    document.getElementById('prod-filters')?.classList.toggle('hidden');
+  });
+  document.getElementById('q-prod')?.addEventListener('input', debounce(applyFilters, 250));
+  ['pf-brand', 'pf-provider', 'pf-season'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', applyFilters);
+  });
   load();
 }
 

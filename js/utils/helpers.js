@@ -108,3 +108,51 @@ export function avatarInitials(name = '') {
 export function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+// --- Ordenar tablas tocando el encabezado ---
+// Detecta números, moneda (₲ 120.000), fechas dd/mm/aaaa y texto.
+function _cellSortValue(td) {
+  if (td.dataset && td.dataset.sort !== undefined) {
+    const n = parseFloat(td.dataset.sort);
+    return isNaN(n) ? String(td.dataset.sort).toLowerCase() : n;
+  }
+  const txt = (td.textContent || '').trim();
+  if (!txt || txt === '–') return '';
+  const dm = txt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (dm) { const y = dm[3].length === 2 ? '20' + dm[3] : dm[3]; return new Date(+y, +dm[2] - 1, +dm[1]).getTime(); }
+  if (/\d/.test(txt) && /^[₲$\s.,\d%–-]+$/.test(txt)) {
+    const num = txt.replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+    const n = parseFloat(num);
+    if (!isNaN(n)) return n;
+  }
+  return txt.toLowerCase();
+}
+
+// Habilita el ordenamiento por click en los <th> de una tabla.
+// Las columnas vacías (acciones) o con clase .no-sort se omiten.
+export function enableTableSort(table) {
+  if (!table || !table.tHead) return;
+  const ths = [...table.tHead.rows[0].cells];
+  ths.forEach((th, idx) => {
+    if (!th.textContent.trim() || th.classList.contains('no-sort')) return;
+    th.classList.add('sortable-th');
+    th.addEventListener('click', () => {
+      const dir = th.dataset.dir === 'asc' ? 'desc' : 'asc';
+      ths.forEach(h => { h.removeAttribute('data-dir'); h.querySelectorAll('.sort-arrow').forEach(a => a.remove()); });
+      th.dataset.dir = dir;
+      const tbody = table.tBodies[0];
+      if (!tbody) return;
+      [...tbody.rows]
+        .sort((ra, rb) => {
+          const va = _cellSortValue(ra.cells[idx]);
+          const vb = _cellSortValue(rb.cells[idx]);
+          const c = (typeof va === 'number' && typeof vb === 'number')
+            ? va - vb
+            : String(va).localeCompare(String(vb), 'es', { numeric: true });
+          return dir === 'asc' ? c : -c;
+        })
+        .forEach(r => tbody.appendChild(r));
+      th.insertAdjacentHTML('beforeend', `<span class="sort-arrow"> ${dir === 'asc' ? '▲' : '▼'}</span>`);
+    });
+  });
+}

@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc, enableTableSort } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateClients, canEditClients, canDeleteClients } from '../auth.js';
 
@@ -34,7 +34,7 @@ export async function renderClients(container) {
     </div>`;
 
   async function load(q = '') {
-    let query = db.from('clients').select('*').eq('active', true).order('code', { nullsFirst: false });
+    let query = db.from('clients').select('*').eq('active', true).order('code', { ascending: false, nullsFirst: false });
     if (q) query = query.ilike('name', `%${q}%`);
     const { data, error } = await query;
     if (error) { toast('Error al cargar clientes', 'error'); return; }
@@ -64,6 +64,7 @@ export async function renderClients(container) {
         </tr>`).join('')}
       </tbody>
     </table>`;
+    enableTableSort(el.querySelector('table'));
   }
 
   function formHTML(c = {}) {

@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc, enableTableSort } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateProviders, canEditProviders, canDeleteProviders } from '../auth.js';
 
@@ -48,6 +48,7 @@ export async function renderProviders(container) {
         </tr>`).join('')}
       </tbody>
     </table>`;
+    enableTableSort(el.querySelector('table'));
   }
 
   function formHTML(p = {}) {

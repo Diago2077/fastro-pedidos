@@ -175,6 +175,9 @@ CREATE POLICY profiles_admin_write ON profiles FOR ALL    TO authenticated USING
 
 
 -- ============================================================
--- FASE 5 — Limpieza (OPCIONAL, solo cuando todo esté verificado)
+-- FASE 5 — Limpieza: eliminar la tabla vieja `users`
+-- La app ya no la usa (todo va por `profiles`). Mientras exista con RLS
+-- apagado, queda expuesta (incluye hashes de contraseña) y el Security
+-- Advisor la marca como error. Esto la elimina y cierra ese aviso.
 -- ============================================================
--- DROP TABLE users;
+DROP TABLE IF EXISTS public.users;

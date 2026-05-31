@@ -361,10 +361,10 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
 
     <!-- FOOTER -->
     <div class="form-footer">
-      <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
       <button type="button" class="btn btn-outline" id="btn-print-order" title="Imprimir / PDF"><i class="fas fa-file-pdf"></i></button>
       ${canExportExcel() ? `<button type="button" class="btn btn-outline" id="btn-excel-order" title="Exportar Excel"><i class="fas fa-file-excel"></i></button>` : ''}
-      ${(orderId ? canEditOrders() : canCreateOrders()) ? `<button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar Pedido</button>` : ''}
+      <button type="button" class="btn btn-secondary" style="margin-left:auto" onclick="closeModal()">Cancelar</button>
+      ${(orderId ? canEditOrders() : canCreateOrders()) ? `<button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar</button>` : ''}
     </div>
   </form>`;
 }

@@ -204,7 +204,7 @@ function buildProductFormHTML(p, provs, initSizes, initColors) {
 
     <div class="form-footer">
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar Producto</button>
+      <button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar</button>
     </div>
   </form>`;
 }

@@ -1,7 +1,7 @@
 import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, fCurrency, fDate, statusBadge, esc, enableTableSort } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
-import { getSession, canExportExcel, canCreateOrders, canEditOrders, canDeleteOrders } from '../auth.js';
+import { getSession, isAdmin, canExportExcel, canCreateOrders, canEditOrders, canDeleteOrders } from '../auth.js';
 
 // In-memory state for order editing
 let _state = {
@@ -39,7 +39,7 @@ export async function renderOrders(container) {
           </div>
           <div id="ord-filters" class="card-actions hidden">
             <select id="filter-client" class="form-control form-control-sm" style="width:auto"><option value="">Todos los clientes</option></select>
-            <select id="filter-seller" class="form-control form-control-sm" style="width:auto"><option value="">Todos los vendedores</option></select>
+            ${isAdmin() ? `<select id="filter-seller" class="form-control form-control-sm" style="width:auto"><option value="">Todos los vendedores</option></select>` : ''}
             <select id="filter-season" class="form-control form-control-sm" style="width:auto"><option value="">Todas las temporadas</option></select>
             <select id="filter-status" class="form-control form-control-sm" style="width:auto">
               <option value="">Todos los estados</option>
@@ -56,9 +56,12 @@ export async function renderOrders(container) {
   let _totByOrder = {};
 
   async function load() {
-    const { data, error } = await db.from('orders')
+    let query = db.from('orders')
       .select('id, order_number, status, season, discount_pct, created_at, shipping_date, clients(id, name), users:profiles(id, name), providers(name)')
       .order('created_at', { ascending: false });
+    // Usuario normal: solo sus propios pedidos (la RLS también lo enforza en la base)
+    if (!isAdmin()) query = query.eq('user_id', getSession()?.id);
+    const { data, error } = await query;
     if (error) { toast('Error al cargar pedidos', 'error'); return; }
     _allOrders = data || [];
 

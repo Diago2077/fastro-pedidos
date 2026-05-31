@@ -164,9 +164,25 @@ CREATE POLICY clients_auth_all          ON clients          FOR ALL TO authentic
 CREATE POLICY providers_auth_all        ON providers        FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY products_auth_all         ON products         FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY product_variants_auth_all ON product_variants FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY orders_auth_all           ON orders           FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY order_items_auth_all      ON order_items      FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY app_config_auth_all       ON app_config       FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- orders / order_items: control por DUEÑO. El admin ve/edita todo;
+-- cada usuario normal solo sus propios pedidos (orders.user_id = auth.uid()).
+CREATE POLICY orders_owner_all ON orders FOR ALL TO authenticated
+  USING      (is_admin() OR user_id = auth.uid())
+  WITH CHECK (is_admin() OR user_id = auth.uid());
+
+CREATE POLICY order_items_owner_all ON order_items FOR ALL TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM orders o
+    WHERE o.id = order_items.order_id
+      AND (is_admin() OR o.user_id = auth.uid())
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM orders o
+    WHERE o.id = order_items.order_id
+      AND (is_admin() OR o.user_id = auth.uid())
+  ));
 
 -- profiles: todos los autenticados pueden LEER; solo admin puede modificar
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;

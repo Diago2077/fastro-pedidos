@@ -33,6 +33,9 @@ export async function renderOrders(container) {
             <i class="fas fa-search"></i>
             <input type="text" id="q-ord" placeholder="Buscar por N° o cliente…" class="form-control">
           </div>
+          <select id="filter-client" class="form-control form-control-sm" style="width:auto"><option value="">Todos los clientes</option></select>
+          <select id="filter-seller" class="form-control form-control-sm" style="width:auto"><option value="">Todos los vendedores</option></select>
+          <select id="filter-season" class="form-control form-control-sm" style="width:auto"><option value="">Todas las temporadas</option></select>
           <select id="filter-status" class="form-control form-control-sm" style="width:auto">
             <option value="">Todos los estados</option>
             <option value="open">Abiertos</option>
@@ -45,22 +48,61 @@ export async function renderOrders(container) {
       <div class="table-responsive" id="ord-tbl"></div>
     </div>`;
 
-  async function load(q = '', status = '') {
-    let query = db.from('orders')
-      .select('id, order_number, status, season, discount_pct, created_at, shipping_date, clients(name), users:profiles(name), providers(name)')
+  let _totByOrder = {};
+
+  async function load() {
+    const { data, error } = await db.from('orders')
+      .select('id, order_number, status, season, discount_pct, created_at, shipping_date, clients(id, name), users:profiles(id, name), providers(name)')
       .order('created_at', { ascending: false });
-    if (q) query = query.or(`order_number.ilike.%${q}%`);
-    if (status) query = query.eq('status', status);
-    const { data, error } = await query;
     if (error) { toast('Error al cargar pedidos', 'error'); return; }
     _allOrders = data || [];
 
-    // Fetch totals per order
+    // Totales por pedido
     const { data: items } = await db.from('order_items').select('order_id, quantity, unit_sale_price');
-    const totByOrder = {};
-    (items || []).forEach(i => { totByOrder[i.order_id] = (totByOrder[i.order_id] || 0) + i.quantity * i.unit_sale_price; });
+    _totByOrder = {};
+    (items || []).forEach(i => { _totByOrder[i.order_id] = (_totByOrder[i.order_id] || 0) + i.quantity * i.unit_sale_price; });
 
-    render(_allOrders, totByOrder);
+    populateFilters();
+    applyFilters();
+  }
+
+  // Rellena los desplegables de cliente/vendedor/temporada con los valores presentes
+  function populateFilters() {
+    const clients = new Map(), sellers = new Map(), seasons = new Set();
+    _allOrders.forEach(o => {
+      if (o.clients?.id) clients.set(o.clients.id, o.clients.name);
+      if (o.users?.id)   sellers.set(o.users.id, o.users.name);
+      if (o.season)      seasons.add(o.season);
+    });
+    fillSelect('filter-client', [...clients.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])), 'Todos los clientes');
+    fillSelect('filter-seller', [...sellers.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])), 'Todos los vendedores');
+    fillSelect('filter-season', [...seasons].sort().map(s => [s, s]), 'Todas las temporadas');
+  }
+
+  function fillSelect(id, entries, placeholder) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = `<option value="">${placeholder}</option>` +
+      entries.map(([val, label]) => `<option value="${esc(String(val))}">${esc(label)}</option>`).join('');
+    if ([...sel.options].some(o => o.value === current)) sel.value = current;
+  }
+
+  function applyFilters() {
+    const q      = normTxt(document.getElementById('q-ord')?.value.trim() || '');
+    const status = document.getElementById('filter-status')?.value || '';
+    const client = document.getElementById('filter-client')?.value || '';
+    const seller = document.getElementById('filter-seller')?.value || '';
+    const season = document.getElementById('filter-season')?.value || '';
+
+    let rows = _allOrders;
+    if (q)      rows = rows.filter(o => normTxt(o.order_number).includes(q) || normTxt(o.clients?.name).includes(q));
+    if (status) rows = rows.filter(o => o.status === status);
+    if (client) rows = rows.filter(o => o.clients?.id === client);
+    if (seller) rows = rows.filter(o => o.users?.id === seller);
+    if (season) rows = rows.filter(o => (o.season || '') === season);
+
+    render(rows, _totByOrder);
   }
 
   function render(rows, totByOrder = {}) {
@@ -112,11 +154,9 @@ export async function renderOrders(container) {
     }
   });
 
-  document.getElementById('q-ord')?.addEventListener('input', debounce(e => {
-    load(e.target.value.trim(), document.getElementById('filter-status').value);
-  }, 300));
-  document.getElementById('filter-status')?.addEventListener('change', e => {
-    load(document.getElementById('q-ord').value.trim(), e.target.value);
+  document.getElementById('q-ord')?.addEventListener('input', debounce(applyFilters, 250));
+  ['filter-status', 'filter-client', 'filter-seller', 'filter-season'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', applyFilters);
   });
 
   load();

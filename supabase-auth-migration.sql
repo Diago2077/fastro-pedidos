@@ -65,7 +65,7 @@ $$;
 CREATE OR REPLACE FUNCTION next_order_number() RETURNS TEXT
 LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
 BEGIN
-  RETURN 'PED-' || LPAD(nextval('order_number_seq')::TEXT, 4, '0');
+  RETURN 'FAS-' || LPAD(nextval('order_number_seq')::TEXT, 4, '0');
 END; $$;
 
 -- 1.5 Re-apuntar orders.user_id a profiles (seguro: 0 pedidos)

@@ -80,7 +80,7 @@ CREATE SEQUENCE IF NOT EXISTS order_number_seq START 1;
 CREATE OR REPLACE FUNCTION next_order_number()
 RETURNS TEXT LANGUAGE plpgsql AS $$
 BEGIN
-  RETURN 'PED-' || LPAD(nextval('order_number_seq')::TEXT, 4, '0');
+  RETURN 'FAS-' || LPAD(nextval('order_number_seq')::TEXT, 4, '0');
 END;
 $$;
 

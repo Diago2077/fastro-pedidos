@@ -122,6 +122,16 @@ function showApp(user) {
   document.getElementById('sidebar-close')?.addEventListener('click', closeSidebarMobile);
   document.getElementById('sidebar-overlay')?.addEventListener('click', closeSidebarMobile);
 
+  // Toggle de tema (claro/oscuro)
+  syncThemeIcon();
+  document.getElementById('theme-toggle')?.addEventListener('click', () => {
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const next = dark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('fastro_theme', next); } catch (e) {}
+    syncThemeIcon();
+  });
+
   // Logout (signOut → onAuthStateChange recarga al login)
   document.getElementById('logout-btn')?.addEventListener('click', () => { logout(); });
 
@@ -172,6 +182,17 @@ function navigate(section) {
   const content = document.getElementById('content-area');
   content.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin fa-2x"></i></div>`;
   sections[section].render(content);
+}
+
+function syncThemeIcon() {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const btn = document.getElementById('theme-toggle');
+  if (btn) {
+    btn.innerHTML = `<i class="fas fa-${dark ? 'sun' : 'moon'}"></i>`;
+    btn.title = dark ? 'Modo claro' : 'Modo oscuro';
+  }
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', dark ? '#0f1115' : '#ffffff');
 }
 
 function openSidebarMobile() {

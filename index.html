@@ -7,6 +7,19 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>FASTRO — Sistema de Pedidos</title>
+
+  <!-- Tema (aplicado antes de pintar para evitar parpadeo) -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('fastro_theme');
+        if (t !== 'dark' && t !== 'light') {
+          t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
   <link rel="icon" href="assets/favicon.png?v=2" type="image/png">
 
   <!-- PWA -->
@@ -116,6 +129,7 @@
     <header class="topbar">
       <button id="sidebar-open" class="icon-btn"><i class="fas fa-bars"></i></button>
       <h1 class="page-title" id="page-title">Dashboard</h1>
+      <button id="theme-toggle" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema"><i class="fas fa-moon"></i></button>
       <div id="topbar-actions"></div>
     </header>
     <main id="content-area" class="content-area"></main>

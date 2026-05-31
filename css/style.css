@@ -30,6 +30,38 @@
   --transition:    150ms ease;
 }
 
+/* ============================================================
+   TEMA OSCURO
+   ============================================================ */
+[data-theme="dark"] {
+  --primary:       #0b0b0d;
+  --primary-hover: #1c1c20;
+  --accent:        #d11f1f;   /* rojo un poco más brillante para contraste en oscuro */
+  --accent-hover:  #b01818;
+  --accent-light:  #2a1618;   /* tinte rojo oscuro para hovers/activos */
+  --bg:            #0f1115;
+  --surface:       #1a1d23;
+  --border:        #2c313b;
+  --border-light:  #232730;
+  --text:          #e8eaed;
+  --text-muted:    #9aa1ac;
+  --text-light:    #6b7280;
+  --shadow:        0 1px 3px rgba(0,0,0,.45);
+  --shadow-md:     0 4px 8px rgba(0,0,0,.5);
+  --shadow-lg:     0 10px 28px rgba(0,0,0,.6);
+}
+
+/* En oscuro, el logo (negro) necesita un fondo claro para verse */
+[data-theme="dark"] .login-logo {
+  background: #fff;
+  padding: 10px 16px;
+  border-radius: 10px;
+}
+/* Realce de celda de cantidad (pedido) adaptado a oscuro */
+[data-theme="dark"] .product-grid-table .grid-qty[style] {
+  background: var(--accent-light) !important;
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html { font-size: 15px; -webkit-text-size-adjust: 100%; }

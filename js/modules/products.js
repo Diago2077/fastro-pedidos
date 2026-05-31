@@ -46,26 +46,39 @@ export async function renderProducts(container) {
       <thead><tr><th>Código</th><th>Descripción</th><th>Marca</th><th>Proveedor</th><th>Temporada</th><th>Colores</th><th>Tallas</th><th class="text-end">Precio Venta</th><th></th></tr></thead>
       <tbody>
         ${rows.map(p => {
-          const colors = [...new Set((p.product_variants || []).map(v => v.color))].join(', ');
-          const sizes  = [...new Set((p.product_variants || []).map(v => v.size))].join(', ');
-          const prices = (p.product_variants || []).map(v => v.sale_price).filter(x => x > 0);
-          const minP = prices.length ? Math.min(...prices) : null;
-          const maxP = prices.length ? Math.max(...prices) : null;
-          const priceLabel = minP === null ? '–' : minP === maxP ? fCurrency(minP) : `${fCurrency(minP)} – ${fCurrency(maxP)}`;
-          return `<tr>
+          const variants = p.product_variants || [];
+          const colors = [...new Set(variants.map(v => v.color))].join(', ') || '–';
+
+          // Agrupar tallas por precio: una fila por cada precio distinto
+          const byPrice = new Map();
+          variants.forEach(v => {
+            const key = v.sale_price ?? 0;
+            if (!byPrice.has(key)) byPrice.set(key, new Set());
+            byPrice.get(key).add(v.size);
+          });
+          const groups = [...byPrice.entries()].sort((a, b) => a[0] - b[0]);
+
+          const actions = `<td class="td-actions">
+              ${_canEdit   ? `<button class="btn btn-xs btn-outline" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
+              ${_canDelete ? `<button class="btn btn-xs btn-danger-outline" onclick="window._pr.del('${p.id}')"><i class="fas fa-trash"></i></button>` : ''}
+            </td>`;
+
+          const makeRow = (sizes, priceLabel) => `<tr>
             <td><strong>${esc(p.code)}</strong></td>
             <td>${esc(p.description)}</td>
             <td>${esc(p.brand || '–')}</td>
             <td>${esc(p.providers?.name || '–')}</td>
             <td>${esc(p.season || '–')}</td>
-            <td><span class="text-muted small">${esc(colors || '–')}</span></td>
-            <td><span class="text-muted small">${esc(sizes || '–')}</span></td>
+            <td><span class="text-muted small">${esc(colors)}</span></td>
+            <td><span class="text-muted small">${esc(sizes)}</span></td>
             <td class="text-end">${priceLabel}</td>
-            <td class="td-actions">
-              ${_canEdit   ? `<button class="btn btn-xs btn-outline" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
-              ${_canDelete ? `<button class="btn btn-xs btn-danger-outline" onclick="window._pr.del('${p.id}')"><i class="fas fa-trash"></i></button>` : ''}
-            </td>
+            ${actions}
           </tr>`;
+
+          // Sin variantes => una sola fila con guiones
+          if (!groups.length) return makeRow('–', '–');
+          // Una fila por precio, con solo las tallas de ese precio
+          return groups.map(([price, sizeSet]) => makeRow([...sizeSet].join(', '), fCurrency(price))).join('');
         }).join('')}
       </tbody>
     </table>`;

@@ -464,7 +464,9 @@ select.form-control { cursor: pointer; }
 .table-sm th, .table-sm td { padding: 6px 10px; }
 .table-bordered td, .table-bordered th { border: 1px solid var(--border); }
 
-.td-actions { text-align: right; white-space: nowrap; display: flex; gap: 4px; justify-content: flex-end; }
+.td-actions { text-align: right; white-space: nowrap; }
+.td-actions .btn { vertical-align: middle; }
+.td-actions .btn + .btn { margin-left: 4px; }
 
 /* Encabezados ordenables */
 .sortable-th { cursor: pointer; user-select: none; }
@@ -1067,7 +1069,7 @@ select.form-control { cursor: pointer; }
   .search-box { flex: 1 1 100%; }
 
   /* Acciones de tabla cómodas para el dedo */
-  .td-actions { gap: 6px; }
+  .td-actions .btn + .btn { margin-left: 6px; }
 
   /* Totales del pedido ocupan todo el ancho */
   .order-totals { max-width: none; }

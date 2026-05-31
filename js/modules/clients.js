@@ -24,8 +24,8 @@ export async function renderClients(container) {
             <i class="fas fa-search"></i>
             <input type="text" id="q-clients" placeholder="Buscar cliente…" class="form-control">
           </div>
-          <button class="btn btn-sm btn-outline" onclick="window._cl.pdf()"><i class="fas fa-file-pdf"></i> PDF</button>
-          ${canExportExcel() ? `<button class="btn btn-sm btn-outline" onclick="window._cl.xls()"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
+          <button class="btn btn-sm btn-outline" title="Exportar PDF" onclick="window._cl.pdf()"><i class="fas fa-file-pdf"></i></button>
+          ${canExportExcel() ? `<button class="btn btn-sm btn-outline" title="Exportar Excel" onclick="window._cl.xls()"><i class="fas fa-file-excel"></i></button>` : ''}
           ${canCreateClients() ? `<button class="btn btn-sm btn-outline" onclick="window._cl.importExcel()"><i class="fas fa-file-upload"></i> Importar</button>` : ''}
           ${canCreateClients() ? `<button class="btn btn-accent" onclick="window._cl.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
         </div>

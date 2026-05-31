@@ -77,8 +77,8 @@ function renderSeasonReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
       <div class="card-header">
         <h5 class="card-title">Detalle por Temporada</h5>
         <div class="card-actions">
-          <button class="btn btn-sm btn-outline" id="rpt-s-pdf"><i class="fas fa-file-pdf"></i> PDF</button>
-          ${showXls ? `<button class="btn btn-sm btn-outline" id="rpt-s-xls"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
+          <button class="btn btn-sm btn-outline" id="rpt-s-pdf" title="Exportar PDF"><i class="fas fa-file-pdf"></i></button>
+          ${showXls ? `<button class="btn btn-sm btn-outline" id="rpt-s-xls" title="Exportar Excel"><i class="fas fa-file-excel"></i></button>` : ''}
         </div>
       </div>
       <div class="table-responsive">
@@ -161,8 +161,8 @@ function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
       <div class="card-header">
         <h5 class="card-title">Detalle por Vendedor</h5>
         <div class="card-actions">
-          <button class="btn btn-sm btn-outline" id="rpt-v-pdf"><i class="fas fa-file-pdf"></i> PDF</button>
-          ${showXls ? `<button class="btn btn-sm btn-outline" id="rpt-v-xls"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
+          <button class="btn btn-sm btn-outline" id="rpt-v-pdf" title="Exportar PDF"><i class="fas fa-file-pdf"></i></button>
+          ${showXls ? `<button class="btn btn-sm btn-outline" id="rpt-v-xls" title="Exportar Excel"><i class="fas fa-file-excel"></i></button>` : ''}
         </div>
       </div>
       <div class="table-responsive">

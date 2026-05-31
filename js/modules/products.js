@@ -20,8 +20,8 @@ export async function renderProducts(container) {
             <i class="fas fa-search"></i>
             <input type="text" id="q-prod" placeholder="Buscar por código o descripción…" class="form-control">
           </div>
-          <button class="btn btn-sm btn-outline" onclick="window._pr.pdf()"><i class="fas fa-file-pdf"></i> PDF</button>
-          ${_canXls    ? `<button class="btn btn-sm btn-outline" onclick="window._pr.xls()"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
+          <button class="btn btn-sm btn-outline" title="Exportar PDF" onclick="window._pr.pdf()"><i class="fas fa-file-pdf"></i></button>
+          ${_canXls    ? `<button class="btn btn-sm btn-outline" title="Exportar Excel" onclick="window._pr.xls()"><i class="fas fa-file-excel"></i></button>` : ''}
           ${_canCreate ? `<button class="btn btn-sm btn-outline" onclick="window._pr.importExcel()"><i class="fas fa-file-upload"></i> Importar Excel</button>` : ''}
           ${_canCreate ? `<button class="btn btn-accent" onclick="window._pr.form()"><i class="fas fa-plus"></i> Nuevo Producto</button>` : ''}
         </div>

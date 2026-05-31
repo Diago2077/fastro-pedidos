@@ -14,8 +14,8 @@ export async function renderProviders(container) {
             <i class="fas fa-search"></i>
             <input type="text" id="q-prov" placeholder="Buscar proveedor…" class="form-control">
           </div>
-          <button class="btn btn-sm btn-outline" onclick="window._pv.pdf()"><i class="fas fa-file-pdf"></i> PDF</button>
-          ${canExportExcel() ? `<button class="btn btn-sm btn-outline" onclick="window._pv.xls()"><i class="fas fa-file-excel"></i> Excel</button>` : ''}
+          <button class="btn btn-sm btn-outline" title="Exportar PDF" onclick="window._pv.pdf()"><i class="fas fa-file-pdf"></i></button>
+          ${canExportExcel() ? `<button class="btn btn-sm btn-outline" title="Exportar Excel" onclick="window._pv.xls()"><i class="fas fa-file-excel"></i></button>` : ''}
           ${canCreateProviders() ? `<button class="btn btn-accent" onclick="window._pv.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
         </div>
       </div>

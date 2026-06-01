@@ -1,0 +1,7 @@
+# Herramientas locales de Claude Code (no versionar)
+.claude/
+
+# Sistema operativo / editores
+Thumbs.db
+.DS_Store
+*.log

@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc, fCurrency, enableTableSort } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, enableTableSort } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canSeeCost, canCreateProducts, canEditProducts, canDeleteProducts, canExportExcel } from '../auth.js';
 
@@ -40,10 +40,12 @@ export async function renderProducts(container) {
   const normTxt = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
   async function load() {
+    const tbl = document.getElementById('pr-tbl');
+    if (tbl) tbl.innerHTML = loadingHTML();
     const { data, error } = await db.from('products')
       .select('*, providers(name), product_variants(id, color, size, sale_price, cost_price)')
       .eq('active', true).order('code');
-    if (error) { toast('Error al cargar productos', 'error'); return; }
+    if (error) { if (tbl) tbl.innerHTML = emptyState('Error al cargar productos'); toast('Error al cargar productos', 'error'); return; }
     _all = data || [];
     populateFilters();
     applyFilters();
@@ -604,7 +606,7 @@ export function openImportModal(reloadFn) {
     setLoading(btn, true);
     try {
       const result = await executeImport(_parsedRows);
-      toast(`Importación completa: ${result.created} nuevos, ${result.updated} actualizados${result.errors > 0 ? `, ${result.errors} con errores` : ''}`, result.errors > 0 ? 'warning' : 'success', 5000);
+      toast(`Importación completa: ${result.created} nuevos, ${result.updated} actualizados${result.errors > 0 ? `, ${result.errors} con errores (ver detalle en la consola)` : ''}`, result.errors > 0 ? 'warning' : 'success', 5000);
       closeModal();
       reloadFn();
     } catch (err) {
@@ -672,8 +674,9 @@ async function executeImport(rows) {
       // Upsert variants
       const variantPayloads = variants.map(v => ({ product_id: productId, ...v }));
       await db.from('product_variants').upsert(variantPayloads, { onConflict: 'product_id,color,size', ignoreDuplicates: false });
-    } catch {
+    } catch (e) {
       errors++;
+      console.warn(`Import producto código ${code}:`, e?.message || e);
     }
   }
 

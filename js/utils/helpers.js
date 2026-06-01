@@ -41,12 +41,12 @@ export function closeModal() {
 // --- Date / Currency formatters ---
 export function fDate(d) {
   if (!d) return '–';
-  return new Date(d.includes('T') ? d : d + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return new Date(d.includes('T') ? d : d + 'T12:00:00').toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 export function fDateTime(d) {
   if (!d) return '–';
-  return new Date(d).toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(d).toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export function fCurrency(n) {
@@ -54,7 +54,7 @@ export function fCurrency(n) {
 }
 
 export function fNum(n) {
-  return (n || 0).toLocaleString('es-EC');
+  return (n || 0).toLocaleString('es-PY');
 }
 
 // --- Status badge ---
@@ -62,12 +62,6 @@ export function statusBadge(s) {
   const m = { open: ['Abierto', 'info'], closed: ['Cerrado', 'warning'], sent: ['Enviado', 'success'] };
   const [label, type] = m[s] || [s, 'secondary'];
   return `<span class="badge badge-${type}">${label}</span>`;
-}
-
-// --- Password hash (SHA-256 via Web Crypto) ---
-export async function hashPwd(password) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // --- Confirm ---
@@ -84,6 +78,11 @@ export function setLoading(btn, on) {
 // --- Empty state ---
 export function emptyState(msg = 'Sin registros') {
   return `<div class="empty-state"><i class="fas fa-inbox"></i><p>${msg}</p></div>`;
+}
+
+// --- Loading spinner (para inyectar mientras carga una lista) ---
+export function loadingHTML(msg = 'Cargando…') {
+  return `<div class="loading-spinner"><i class="fas fa-spinner fa-spin fa-2x"></i><span class="sr-only">${msg}</span></div>`;
 }
 
 // --- Today YYYY-MM-DD ---

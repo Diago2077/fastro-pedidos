@@ -17,7 +17,7 @@ export function exportPDF(docTitle, columns, rows, filename = 'reporte.pdf') {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text(docTitle, 14, 17);
-  doc.text(`Generado: ${new Date().toLocaleDateString('es-EC')}`, pageW - 14, 17, { align: 'right' });
+  doc.text(`Generado: ${new Date().toLocaleDateString('es-PY')}`, pageW - 14, 17, { align: 'right' });
 
   doc.autoTable({
     startY: 27,

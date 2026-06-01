@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc, enableTableSort } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateClients, canEditClients, canDeleteClients } from '../auth.js';
 
@@ -34,10 +34,12 @@ export async function renderClients(container) {
     </div>`;
 
   async function load(q = '') {
+    const tbl = document.getElementById('cl-tbl');
+    if (tbl) tbl.innerHTML = loadingHTML();
     let query = db.from('clients').select('*').eq('active', true).order('code', { ascending: false, nullsFirst: false });
     if (q) query = query.ilike('name', `%${q}%`);
     const { data, error } = await query;
-    if (error) { toast('Error al cargar clientes', 'error'); return; }
+    if (error) { if (tbl) tbl.innerHTML = emptyState('Error al cargar clientes'); toast('Error al cargar clientes', 'error'); return; }
     _all = data || [];
     render(_all);
   }
@@ -331,7 +333,7 @@ function openClientImportModal(reloadFn) {
     setLoading(btn, true);
     try {
       const result = await executeClientImport(_parsedRows);
-      toast(`Importación completa: ${result.created} nuevos, ${result.updated} actualizados${result.errors > 0 ? `, ${result.errors} con errores` : ''}`, result.errors > 0 ? 'warning' : 'success', 5000);
+      toast(`Importación completa: ${result.created} nuevos, ${result.updated} actualizados${result.errors > 0 ? `, ${result.errors} con errores (ver detalle en la consola)` : ''}`, result.errors > 0 ? 'warning' : 'success', 5000);
       closeModal();
       reloadFn();
     } catch (err) {
@@ -376,8 +378,9 @@ async function executeClientImport(rows) {
         byCode[r.code] = data.id; // evita duplicar el mismo código dentro del archivo
         created++;
       }
-    } catch {
+    } catch (e) {
       errors++;
+      console.warn(`Import cliente código ${r.code}:`, e?.message || e);
     }
   }
 

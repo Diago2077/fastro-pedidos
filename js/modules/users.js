@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, setLoading, esc, enableTableSort } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, esc, enableTableSort } from '../utils/helpers.js';
 import { getSession } from '../auth.js';
 
 export async function renderUsers(container) {
@@ -15,8 +15,10 @@ export async function renderUsers(container) {
     </div>`;
 
   async function load() {
+    const tbl = document.getElementById('usr-tbl');
+    if (tbl) tbl.innerHTML = loadingHTML();
     const { data, error } = await db.from('profiles').select('id, name, email, role, active, created_at').order('name');
-    if (error) { toast('Error al cargar usuarios', 'error'); return; }
+    if (error) { if (tbl) tbl.innerHTML = emptyState('Error al cargar usuarios'); toast('Error al cargar usuarios', 'error'); return; }
     render(data || []);
   }
 
@@ -33,7 +35,7 @@ export async function renderUsers(container) {
           <td>${esc(u.email)}</td>
           <td><span class="badge ${u.role === 'admin' ? 'badge-danger' : 'badge-secondary'}">${u.role === 'admin' ? 'Admin' : 'Usuario'}</span></td>
           <td><span class="badge ${u.active ? 'badge-success' : 'badge-secondary'}">${u.active ? 'Activo' : 'Inactivo'}</span></td>
-          <td>${new Date(u.created_at).toLocaleDateString('es-EC')}</td>
+          <td>${new Date(u.created_at).toLocaleDateString('es-PY')}</td>
           <td class="td-actions">
             <button class="btn btn-xs btn-outline" onclick="window._usr.form('${u.id}')"><i class="fas fa-edit"></i></button>
             ${u.id !== currentId ? `<button class="btn btn-xs btn-danger-outline" onclick="window._usr.toggle('${u.id}', ${u.active})">

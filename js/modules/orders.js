@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, fCurrency, fDate, statusBadge, esc, enableTableSort } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, fCurrency, fDate, statusBadge, esc, enableTableSort } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { getSession, isAdmin, canExportExcel, canCreateOrders, canEditOrders, canDeleteOrders } from '../auth.js';
 
@@ -56,13 +56,15 @@ export async function renderOrders(container) {
   let _totByOrder = {};
 
   async function load() {
+    const tbl = document.getElementById('ord-tbl');
+    if (tbl) tbl.innerHTML = loadingHTML();
     let query = db.from('orders')
       .select('id, order_number, status, season, discount_pct, created_at, shipping_date, clients(id, name), users:profiles(id, name), providers(name)')
       .order('created_at', { ascending: false });
     // Usuario normal: solo sus propios pedidos (la RLS también lo enforza en la base)
     if (!isAdmin()) query = query.eq('user_id', getSession()?.id);
     const { data, error } = await query;
-    if (error) { toast('Error al cargar pedidos', 'error'); return; }
+    if (error) { if (tbl) tbl.innerHTML = emptyState('Error al cargar pedidos'); toast('Error al cargar pedidos', 'error'); return; }
     _allOrders = data || [];
 
     // Totales por pedido
@@ -274,11 +276,12 @@ async function openOrderModal(orderId, onSavedFn) {
   searchInput?.addEventListener('input', debounce(async e => {
     const q = e.target.value.trim();
     if (q.length < 2) { searchResults.classList.add('hidden'); return; }
-    const { data } = await db.from('products')
+    const { data, error } = await db.from('products')
       .select('id, code, description, product_variants(id, color, size, sale_price, cost_price, created_at)')
       .eq('active', true)
       .or(`code.ilike.%${q}%,description.ilike.%${q}%`)
       .limit(10);
+    if (error) { searchResults.innerHTML = '<div class="sr-item text-muted">Error al buscar productos</div>'; searchResults.classList.remove('hidden'); return; }
     if (!data?.length) { searchResults.innerHTML = '<div class="sr-item text-muted">Sin resultados</div>'; searchResults.classList.remove('hidden'); return; }
     searchResults.innerHTML = data.map(p => `
       <div class="sr-item" data-id="${p.id}" data-code="${esc(p.code)}" data-desc="${esc(p.description)}">

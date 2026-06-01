@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { fCurrency, fDate, enableTableSort } from '../utils/helpers.js';
+import { fCurrency, fDate, enableTableSort, emptyState, loadingHTML, toast } from '../utils/helpers.js';
 import { canSeeCost } from '../auth.js';
 
 const charts = {};
@@ -52,12 +52,27 @@ export async function renderDashboard(container) {
       <div class="table-responsive" id="recent-tbl"></div>
     </div>`;
 
-  // Load data in parallel
-  const [ordersRes, itemsRes, cfgRes] = await Promise.all([
-    db.from('orders').select('id, order_number, status, discount_pct, season, created_at, clients(name), users:profiles(name)'),
-    db.from('order_items').select('order_id, quantity, unit_sale_price, unit_cost_price'),
-    db.from('app_config').select('value').eq('key', 'current_season').maybeSingle()
-  ]);
+  const recentTbl = document.getElementById('recent-tbl');
+  if (recentTbl) recentTbl.innerHTML = loadingHTML();
+
+  // Load data in parallel (con manejo de error para no quedar a medio render)
+  let ordersRes, itemsRes, cfgRes;
+  try {
+    [ordersRes, itemsRes, cfgRes] = await Promise.all([
+      db.from('orders').select('id, order_number, status, discount_pct, season, created_at, clients(name), users:profiles(name)'),
+      db.from('order_items').select('order_id, quantity, unit_sale_price, unit_cost_price'),
+      db.from('app_config').select('value').eq('key', 'current_season').maybeSingle()
+    ]);
+  } catch (e) {
+    container.innerHTML = emptyState('Error al cargar el panel');
+    toast('Error al cargar el panel', 'error');
+    return;
+  }
+  if (ordersRes.error || itemsRes.error) {
+    container.innerHTML = emptyState('Error al cargar el panel');
+    toast('Error al cargar el panel', 'error');
+    return;
+  }
 
   const orders = ordersRes.data || [];
   const items  = itemsRes.data  || [];

@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, setLoading, debounce, esc, enableTableSort } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateProviders, canEditProviders, canDeleteProviders } from '../auth.js';
 
@@ -23,6 +23,8 @@ export async function renderProviders(container) {
     </div>`;
 
   async function load(q = '') {
+    const tbl = document.getElementById('pv-tbl');
+    if (tbl) tbl.innerHTML = loadingHTML();
     let query = db.from('providers').select('*').eq('active', true).order('name');
     if (q) query = query.ilike('name', `%${q}%`);
     const { data, error } = await query;
@@ -40,7 +42,7 @@ export async function renderProviders(container) {
       <tbody>
         ${rows.map(p => `<tr>
           <td><strong>${esc(p.name)}</strong></td>
-          <td>${new Date(p.created_at).toLocaleDateString('es-EC')}</td>
+          <td>${new Date(p.created_at).toLocaleDateString('es-PY')}</td>
           <td class="td-actions">
             ${canEditProviders()   ? `<button class="btn btn-xs btn-outline" onclick="window._pv.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
             ${canDeleteProviders() ? `<button class="btn btn-xs btn-danger-outline" onclick="window._pv.del('${p.id}')"><i class="fas fa-trash"></i></button>` : ''}

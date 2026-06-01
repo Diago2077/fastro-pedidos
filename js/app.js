@@ -104,6 +104,13 @@ function showApp(user) {
     link.style.display = allowed ? '' : 'none';
   });
 
+  // Ocultar la etiqueta de un grupo si ninguno de sus ítems quedó visible
+  document.querySelectorAll('.sidebar-nav .nav-group').forEach(group => {
+    const anyVisible = [...group.querySelectorAll('.nav-link[data-section]')]
+      .some(l => l.style.display !== 'none');
+    group.style.display = anyVisible ? '' : 'none';
+  });
+
   // Sidebar navigation
   document.querySelectorAll('.nav-link[data-section]').forEach(link => {
     link.addEventListener('click', e => {

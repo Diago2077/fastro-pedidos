@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateClients, canEditClients, canDeleteClients } from '../auth.js';
 
@@ -24,6 +24,7 @@ export async function renderClients(container) {
             <i class="fas fa-search"></i>
             <input type="text" id="q-clients" placeholder="Buscar cliente…" class="form-control">
           </div>
+          ${canDeleteClients() ? `<button class="btn btn-sm btn-danger" id="cl-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
           <button class="btn btn-sm btn-outline" title="Exportar PDF" onclick="window._cl.pdf()"><i class="fas fa-file-pdf"></i></button>
           ${canExportExcel() ? `<button class="btn btn-sm btn-outline" title="Exportar Excel" onclick="window._cl.xls()"><i class="fas fa-file-excel"></i></button>` : ''}
           ${canCreateClients() ? `<button class="btn btn-sm btn-outline" onclick="window._cl.importExcel()"><i class="fas fa-file-upload"></i> Importar</button>` : ''}
@@ -48,10 +49,12 @@ export async function renderClients(container) {
     const el = document.getElementById('cl-tbl');
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay clientes registrados'); return; }
+    const canDel = canDeleteClients();
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th>Código</th><th>Nombre</th><th>Tienda</th><th>RUC</th><th>Teléfono</th><th>Ciudad</th><th>Correo</th><th></th></tr></thead>
+      <thead><tr>${canDel ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Código</th><th>Nombre</th><th>Tienda</th><th>RUC</th><th>Teléfono</th><th>Ciudad</th><th>Correo</th><th></th></tr></thead>
       <tbody>
         ${rows.map(c => `<tr>
+          ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${c.id}"></td>` : ''}
           <td><strong>${c.code ?? '–'}</strong></td>
           <td>${esc(c.name)}</td>
           <td>${esc(c.store_name || '–')}</td>
@@ -60,13 +63,17 @@ export async function renderClients(container) {
           <td>${esc(c.city || '–')}</td>
           <td>${esc(c.email || '–')}</td>
           <td class="td-actions">
-            ${canEditClients()   ? `<button class="btn btn-xs btn-outline" onclick="window._cl.form('${c.id}')"><i class="fas fa-edit"></i></button>` : ''}
-            ${canDeleteClients() ? `<button class="btn btn-xs btn-danger-outline" onclick="window._cl.del('${c.id}')"><i class="fas fa-trash"></i></button>` : ''}
+            ${canEditClients() ? `<button class="btn btn-xs btn-outline" onclick="window._cl.form('${c.id}')"><i class="fas fa-edit"></i></button>` : ''}
           </td>
         </tr>`).join('')}
       </tbody>
     </table>`;
     enableTableSort(el.querySelector('table'));
+    if (canDel) enableBulkDelete(el.querySelector('table'), document.getElementById('cl-bulk-del'), async ids => {
+      const { error } = await db.from('clients').update({ active: false }).in('id', ids);
+      if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
+      toast(`${ids.length} cliente(s) eliminado(s)`); load();
+    });
   }
 
   function formHTML(c = {}) {

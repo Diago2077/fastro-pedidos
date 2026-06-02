@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, enableTableSort } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, enableTableSort, enableBulkDelete } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canSeeCost, canCreateProducts, canEditProducts, canDeleteProducts, canExportExcel } from '../auth.js';
 
@@ -22,6 +22,7 @@ export async function renderProducts(container) {
               <input type="text" id="q-prod" placeholder="Buscar por código o descripción…" class="form-control">
             </div>
             <button id="btn-toggle-prod-filters" type="button" class="btn btn-sm btn-outline"><i class="fas fa-filter"></i> Filtro</button>
+            ${_canDelete ? `<button class="btn btn-sm btn-danger" id="pr-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
             <button class="btn btn-sm btn-outline" title="Exportar PDF" onclick="window._pr.pdf()"><i class="fas fa-file-pdf"></i></button>
             ${_canXls    ? `<button class="btn btn-sm btn-outline" title="Exportar Excel" onclick="window._pr.xls()"><i class="fas fa-file-excel"></i></button>` : ''}
             ${_canCreate ? `<button class="btn btn-sm btn-outline" onclick="window._pr.importExcel()"><i class="fas fa-file-upload"></i> Importar</button>` : ''}
@@ -101,7 +102,7 @@ export async function renderProducts(container) {
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay productos registrados'); return; }
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th>Código</th><th>Descripción</th><th>Marca</th><th>Proveedor</th><th>Temporada</th><th>Colores</th><th>Tallas</th><th class="text-end">Precio Venta</th><th></th></tr></thead>
+      <thead><tr>${_canDelete ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Código</th><th>Descripción</th><th>Marca</th><th>Proveedor</th><th>Temporada</th><th>Colores</th><th>Tallas</th><th class="text-end">Precio Venta</th><th></th></tr></thead>
       <tbody>
         ${rows.map(p => {
           const variants = p.product_variants || [];
@@ -116,12 +117,13 @@ export async function renderProducts(container) {
           });
           const groups = [...byPrice.entries()].sort((a, b) => a[0] - b[0]);
 
+          const checkCell = _canDelete ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${p.id}"></td>` : '';
           const actions = `<td class="td-actions">
-              ${_canEdit   ? `<button class="btn btn-xs btn-outline" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
-              ${_canDelete ? `<button class="btn btn-xs btn-danger-outline" onclick="window._pr.del('${p.id}')"><i class="fas fa-trash"></i></button>` : ''}
+              ${_canEdit ? `<button class="btn btn-xs btn-outline" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
             </td>`;
 
           const makeRow = (sizes, priceLabel) => `<tr>
+            ${checkCell}
             <td><strong>${esc(p.code)}</strong></td>
             <td>${esc(p.description)}</td>
             <td>${esc(p.brand || '–')}</td>
@@ -141,6 +143,11 @@ export async function renderProducts(container) {
       </tbody>
     </table>`;
     enableTableSort(el.querySelector('table'));
+    if (_canDelete) enableBulkDelete(el.querySelector('table'), document.getElementById('pr-bulk-del'), async ids => {
+      const { error } = await db.from('products').update({ active: false }).in('id', ids);
+      if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
+      toast(`${ids.length} producto(s) eliminado(s)`); load();
+    });
   }
 
   window._pr = {

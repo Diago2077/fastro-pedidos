@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateProviders, canEditProviders, canDeleteProviders } from '../auth.js';
 
@@ -14,6 +14,7 @@ export async function renderProviders(container) {
             <i class="fas fa-search"></i>
             <input type="text" id="q-prov" placeholder="Buscar proveedor…" class="form-control">
           </div>
+          ${canDeleteProviders() ? `<button class="btn btn-sm btn-danger" id="pv-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
           <button class="btn btn-sm btn-outline" title="Exportar PDF" onclick="window._pv.pdf()"><i class="fas fa-file-pdf"></i></button>
           ${canExportExcel() ? `<button class="btn btn-sm btn-outline" title="Exportar Excel" onclick="window._pv.xls()"><i class="fas fa-file-excel"></i></button>` : ''}
           ${canCreateProviders() ? `<button class="btn btn-accent" onclick="window._pv.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
@@ -37,20 +38,26 @@ export async function renderProviders(container) {
     const el = document.getElementById('pv-tbl');
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay proveedores registrados'); return; }
+    const canDel = canDeleteProviders();
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th>Nombre</th><th>Fecha de registro</th><th></th></tr></thead>
+      <thead><tr>${canDel ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Nombre</th><th>Fecha de registro</th><th></th></tr></thead>
       <tbody>
         ${rows.map(p => `<tr>
+          ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${p.id}"></td>` : ''}
           <td><strong>${esc(p.name)}</strong></td>
           <td>${new Date(p.created_at).toLocaleDateString('es-PY')}</td>
           <td class="td-actions">
-            ${canEditProviders()   ? `<button class="btn btn-xs btn-outline" onclick="window._pv.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
-            ${canDeleteProviders() ? `<button class="btn btn-xs btn-danger-outline" onclick="window._pv.del('${p.id}')"><i class="fas fa-trash"></i></button>` : ''}
+            ${canEditProviders() ? `<button class="btn btn-xs btn-outline" onclick="window._pv.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
           </td>
         </tr>`).join('')}
       </tbody>
     </table>`;
     enableTableSort(el.querySelector('table'));
+    if (canDel) enableBulkDelete(el.querySelector('table'), document.getElementById('pv-bulk-del'), async ids => {
+      const { error } = await db.from('providers').update({ active: false }).in('id', ids);
+      if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
+      toast(`${ids.length} proveedor(es) eliminado(s)`); load();
+    });
   }
 
   function formHTML(p = {}) {

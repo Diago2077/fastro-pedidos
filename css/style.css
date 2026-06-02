@@ -404,6 +404,12 @@ a { color: inherit; text-decoration: none; }
 .btn-full { width: 100%; justify-content: center; }
 .btn-danger-outline { background: transparent; color: var(--danger); border-color: #fed7d7; }
 .btn-danger-outline:hover:not(:disabled) { background: #fff5f5; }
+.btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+.btn-danger:hover:not(:disabled) { background: #c53030; border-color: #c53030; }
+
+/* Columna de selección múltiple en tablas */
+.chk-col { width: 38px; text-align: center; }
+.chk-col .row-chk, .chk-col .chk-all { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
 
 /* ============================================================
    FORMS

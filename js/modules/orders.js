@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, fCurrency, fDate, statusBadge, esc, enableTableSort } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, fCurrency, fDate, statusBadge, esc, enableTableSort, enableBulkDelete } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { getSession, isAdmin, canExportExcel, canCreateOrders, canEditOrders, canDeleteOrders } from '../auth.js';
 
@@ -35,6 +35,7 @@ export async function renderOrders(container) {
               <input type="text" id="q-ord" placeholder="Buscar por N° o cliente…" class="form-control">
             </div>
             <button id="btn-toggle-filters" type="button" class="btn btn-sm btn-outline"><i class="fas fa-filter"></i> Filtro</button>
+            ${canDeleteOrders() ? `<button class="btn btn-sm btn-danger" id="ord-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
             ${canCreateOrders() ? `<button class="btn btn-accent" onclick="window._ord.new()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
           </div>
           <div id="ord-filters" class="card-actions hidden">
@@ -128,13 +129,15 @@ export async function renderOrders(container) {
     const el = document.getElementById('ord-tbl');
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay pedidos'); return; }
+    const canDel = canDeleteOrders();
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th>N° Pedido</th><th>Cliente</th><th>Vendedor</th><th>Proveedor</th><th>Temporada</th><th>Total</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+      <thead><tr>${canDel ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>N° Pedido</th><th>Cliente</th><th>Vendedor</th><th>Proveedor</th><th>Temporada</th><th>Total</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
       <tbody>
         ${rows.map(o => {
           const sub = totByOrder[o.id] || 0;
           const tot = sub * (1 - (o.discount_pct || 0) / 100);
           return `<tr>
+            ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${o.id}"></td>` : ''}
             <td><strong>${esc(o.order_number)}</strong></td>
             <td>${esc(o.clients?.name || '–')}</td>
             <td>${esc(o.users?.name || '–')}</td>
@@ -145,13 +148,17 @@ export async function renderOrders(container) {
             <td>${fDate(o.created_at)}</td>
             <td class="td-actions">
               <button class="btn btn-xs btn-outline" title="Ver / Editar" onclick="window._ord.open('${o.id}')"><i class="fas fa-eye"></i></button>
-              ${canDeleteOrders() ? `<button class="btn btn-xs btn-danger-outline" title="Eliminar" onclick="window._ord.del('${o.id}')"><i class="fas fa-trash"></i></button>` : ''}
             </td>
           </tr>`;
         }).join('')}
       </tbody>
     </table>`;
     enableTableSort(el.querySelector('table'));
+    if (canDel) enableBulkDelete(el.querySelector('table'), document.getElementById('ord-bulk-del'), async ids => {
+      const { error } = await db.from('orders').delete().in('id', ids);
+      if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
+      toast(`${ids.length} pedido(s) eliminado(s)`); load();
+    });
   }
 
   // Use Object.assign so updateQty / removeItem defined at module level are not overwritten

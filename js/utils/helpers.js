@@ -155,3 +155,51 @@ export function enableTableSort(table) {
     });
   });
 }
+
+// --- Selección múltiple + eliminar en lote ---
+// tableEl: la <table> que contiene un checkbox .chk-all en el encabezado
+//          y un .row-chk[value="<id>"] por fila.
+// bulkBtn: botón persistente (en la barra de acciones) que muestra
+//          "Eliminar (N)" y dispara onDelete con los ids seleccionados.
+// onDelete: async (ids[]) => { ...borra y recarga la lista... }
+// Soporta varias filas con el mismo value (ej. un producto con varias
+// filas de precio): se sincronizan y se cuentan como un solo registro.
+export function enableBulkDelete(tableEl, bulkBtn, onDelete) {
+  if (!tableEl || !bulkBtn) return;
+  const all = tableEl.querySelector('.chk-all');
+  const rowChks = () => [...tableEl.querySelectorAll('.row-chk')];
+  const distinct = () => [...new Set(rowChks().filter(c => c.checked).map(c => c.value))];
+
+  function refresh() {
+    const sel = distinct();
+    bulkBtn.style.display = sel.length ? '' : 'none';
+    bulkBtn.innerHTML = `<i class="fas fa-trash"></i> Eliminar (${sel.length})`;
+    if (all) {
+      const total = new Set(rowChks().map(c => c.value)).size;
+      all.checked = sel.length > 0 && sel.length === total;
+      all.indeterminate = sel.length > 0 && sel.length < total;
+    }
+  }
+
+  all?.addEventListener('change', () => {
+    rowChks().forEach(c => { c.checked = all.checked; });
+    refresh();
+  });
+
+  tableEl.addEventListener('change', e => {
+    const chk = e.target.closest('.row-chk');
+    if (!chk) return;
+    // sincronizar filas que comparten el mismo registro
+    tableEl.querySelectorAll(`.row-chk[value="${CSS.escape(chk.value)}"]`).forEach(c => { c.checked = chk.checked; });
+    refresh();
+  });
+
+  bulkBtn.onclick = async () => {
+    const ids = distinct();
+    if (!ids.length) return;
+    if (!await confirm2(`¿Eliminar ${ids.length} registro(s)? Esta acción no se puede deshacer.`)) return;
+    await onDelete(ids);
+  };
+
+  refresh();
+}

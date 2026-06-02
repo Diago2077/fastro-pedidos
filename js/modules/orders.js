@@ -283,13 +283,20 @@ async function openOrderModal(orderId, onSavedFn) {
   searchInput?.addEventListener('input', debounce(async e => {
     const q = e.target.value.trim();
     if (q.length < 2) { searchResults.classList.add('hidden'); return; }
+    const providerId = document.getElementById('order-provider')?.value;
+    if (!providerId) {
+      searchResults.innerHTML = '<div class="sr-item text-muted">Seleccioná un proveedor primero</div>';
+      searchResults.classList.remove('hidden');
+      return;
+    }
     const { data, error } = await db.from('products')
       .select('id, code, description, product_variants(id, color, size, sale_price, cost_price, created_at)')
       .eq('active', true)
+      .eq('provider_id', providerId)
       .or(`code.ilike.%${q}%,description.ilike.%${q}%`)
       .limit(10);
     if (error) { searchResults.innerHTML = '<div class="sr-item text-muted">Error al buscar productos</div>'; searchResults.classList.remove('hidden'); return; }
-    if (!data?.length) { searchResults.innerHTML = '<div class="sr-item text-muted">Sin resultados</div>'; searchResults.classList.remove('hidden'); return; }
+    if (!data?.length) { searchResults.innerHTML = '<div class="sr-item text-muted">Sin resultados para este proveedor</div>'; searchResults.classList.remove('hidden'); return; }
     searchResults.innerHTML = data.map(p => `
       <div class="sr-item" data-id="${p.id}" data-code="${esc(p.code)}" data-desc="${esc(p.description)}">
         <strong>${esc(p.code)}</strong> — ${esc(p.description)}
@@ -314,6 +321,38 @@ async function openOrderModal(orderId, onSavedFn) {
   document.addEventListener('click', e => {
     if (!e.target.closest('#prod-search-wrap')) searchResults?.classList.add('hidden');
   }, { once: true });
+
+  // El buscador de productos se habilita solo con un proveedor elegido,
+  // y muestra únicamente productos de ese proveedor.
+  const providerSelect = document.getElementById('order-provider');
+  function syncProductSearchState() {
+    if (!searchInput) return;
+    const hasProv = !!providerSelect?.value;
+    searchInput.disabled = !hasProv;
+    searchInput.placeholder = hasProv
+      ? 'Buscar producto por código o descripción…'
+      : 'Primero seleccioná un proveedor';
+  }
+  syncProductSearchState();
+
+  let _prevProvider = providerSelect?.value || '';
+  providerSelect?.addEventListener('change', async () => {
+    const newVal = providerSelect.value;
+    // Un pedido pertenece a un solo proveedor: si ya hay ítems, avisar antes de vaciarlos
+    if (_state.items.length && newVal !== _prevProvider) {
+      const ok = await confirm2('Cambiar de proveedor quitará los productos ya agregados al pedido. ¿Continuar?');
+      if (!ok) { providerSelect.value = _prevProvider; return; }
+      _state.items = [];
+      renderItemsTable();
+      updateTotals();
+    }
+    _prevProvider = newVal;
+    if (searchInput) searchInput.value = '';
+    searchResults?.classList.add('hidden');
+    const gridWrap = document.getElementById('product-grid-wrap');
+    if (gridWrap) gridWrap.innerHTML = '';
+    syncProductSearchState();
+  });
 
   // Status button — cycle with confirmation
   document.getElementById('order-status-btn')?.addEventListener('click', async () => {
@@ -376,7 +415,7 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
       </div>
       <div class="form-group">
         <label class="form-label req">Proveedor</label>
-        <select name="provider_id" class="form-control" required>
+        <select name="provider_id" id="order-provider" class="form-control" required>
           <option value="">— Seleccionar —</option>
           ${providerOpts}
         </select>

@@ -681,6 +681,15 @@ async function executeImport(rows) {
       // Upsert variants
       const variantPayloads = variants.map(v => ({ product_id: productId, ...v }));
       await db.from('product_variants').upsert(variantPayloads, { onConflict: 'product_id,color,size', ignoreDuplicates: false });
+
+      // Quitar variantes viejas que ya no vienen en el archivo (ej. color corregido)
+      const keep = new Set(variants.map(v => `${v.color}|||${v.size}`));
+      const { data: existingVars } = await db.from('product_variants').select('id, color, size').eq('product_id', productId);
+      const toDelete = (existingVars || []).filter(v => !keep.has(`${v.color}|||${v.size}`));
+      if (toDelete.length) {
+        const { error: delErr } = await db.from('product_variants').delete().in('id', toDelete.map(v => v.id));
+        if (delErr) console.warn(`No se pudieron quitar variantes viejas de ${code}:`, delErr.message);
+      }
     } catch (e) {
       errors++;
       console.warn(`Import producto código ${code}:`, e?.message || e);

@@ -203,3 +203,50 @@ export function enableBulkDelete(tableEl, bulkBtn, onDelete) {
 
   refresh();
 }
+
+// --- Columnas redimensionables (con recorte en una sola línea vía CSS) ---
+// Fija el ancho de las columnas y agrega una manija en cada encabezado
+// para arrastrar y ensanchar la columna (y así ver el texto recortado).
+// Soporta mouse y táctil (pointer events).
+export function enableColumnResize(table) {
+  if (!table || !table.tHead || !table.tHead.rows[0]) return;
+  const container = table.parentElement;
+  const ths = [...table.tHead.rows[0].cells];
+
+  // Esperar un frame para medir el ancho ya renderizado (layout auto).
+  requestAnimationFrame(() => {
+    if (!table.isConnected) return;
+    const widths = ths.map(th => th.offsetWidth);
+    table.style.tableLayout = 'fixed';
+    ths.forEach((th, i) => { th.style.width = widths[i] + 'px'; th.style.position = 'relative'; });
+
+    const fit = () => {
+      const sum = ths.reduce((a, th) => a + (parseFloat(th.style.width) || th.offsetWidth), 0);
+      table.style.width = Math.max(sum, container ? container.clientWidth : sum) + 'px';
+    };
+    fit();
+
+    ths.forEach(th => {
+      if (th.querySelector('.col-resizer')) return;
+      const grip = document.createElement('span');
+      grip.className = 'col-resizer';
+      th.appendChild(grip);
+      grip.addEventListener('click', ev => ev.stopPropagation()); // no disparar el ordenamiento
+      grip.addEventListener('pointerdown', ev => {
+        ev.preventDefault(); ev.stopPropagation();
+        grip.setPointerCapture?.(ev.pointerId);
+        const startX = ev.clientX;
+        const startW = th.offsetWidth;
+        const onMove = mv => { th.style.width = Math.max(48, startW + (mv.clientX - startX)) + 'px'; fit(); };
+        const onUp = () => {
+          grip.removeEventListener('pointermove', onMove);
+          grip.removeEventListener('pointerup', onUp);
+          document.body.style.userSelect = '';
+        };
+        document.body.style.userSelect = 'none';
+        grip.addEventListener('pointermove', onMove);
+        grip.addEventListener('pointerup', onUp);
+      });
+    });
+  });
+}

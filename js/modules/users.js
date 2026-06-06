@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, esc, enableTableSort } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, esc, enableTableSort, enableColumnResize } from '../utils/helpers.js';
 import { getSession } from '../auth.js';
 
 export async function renderUsers(container) {
@@ -45,6 +45,7 @@ export async function renderUsers(container) {
       </tbody>
     </table>`;
     enableTableSort(el.querySelector('table'));
+    enableColumnResize(el.querySelector('table'));
   }
 
   function formHTML(u = {}) {

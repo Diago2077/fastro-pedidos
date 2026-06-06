@@ -15,6 +15,13 @@ import { renderUsers }      from './modules/users.js';
 import { renderReports }    from './modules/reports.js';
 import { renderSettings }   from './modules/settings.js';
 
+// Tooltip global: muestra el texto completo de una celda recortada al pasar el mouse.
+document.addEventListener('mouseover', e => {
+  const cell = e.target.closest('.table td');
+  if (!cell || cell.title) return;
+  if (cell.scrollWidth > cell.clientWidth) cell.title = cell.textContent.trim();
+}, { passive: true });
+
 // ---- Section registry ----
 const sections = {
   dashboard: { title: 'Dashboard',      render: renderDashboard,  permCheck: canViewDashboard },

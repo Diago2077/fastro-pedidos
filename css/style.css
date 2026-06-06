@@ -523,6 +523,24 @@ select.form-control { cursor: pointer; }
 .table-sm th, .table-sm td { padding: 6px 10px; }
 .table-bordered td, .table-bordered th { border: 1px solid var(--border); }
 
+/* Celdas en una sola línea; el texto que no entra se recorta con "…" */
+.table th, .table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Columnas que nunca se recortan (acciones, checkbox, grilla de productos) */
+.table td.td-actions, .table th.chk-col, .table td.chk-col,
+.product-grid-table th, .product-grid-table td { overflow: visible; text-overflow: clip; }
+
+/* Manija para redimensionar columnas (arrastrar el borde del encabezado) */
+.col-resizer {
+  position: absolute;
+  top: 0; right: 0;
+  width: 8px; height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+  touch-action: none;
+  user-select: none;
+}
+.col-resizer:hover { background: rgba(155,0,0,.3); }
+
 .td-actions { text-align: right; white-space: nowrap; }
 .td-actions .btn { vertical-align: middle; }
 .td-actions .btn + .btn { margin-left: 4px; }

@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateProviders, canEditProviders, canDeleteProviders } from '../auth.js';
 
@@ -53,6 +53,7 @@ export async function renderProviders(container) {
       </tbody>
     </table>`;
     enableTableSort(el.querySelector('table'));
+    enableColumnResize(el.querySelector('table'));
     if (canDel) enableBulkDelete(el.querySelector('table'), document.getElementById('pv-bulk-del'), async ids => {
       const { error } = await db.from('providers').update({ active: false }).in('id', ids);
       if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }

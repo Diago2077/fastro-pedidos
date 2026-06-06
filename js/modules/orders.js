@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, fCurrency, fDate, statusBadge, esc, enableTableSort, enableBulkDelete } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, fCurrency, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { getSession, isAdmin, canExportExcel, canCreateOrders, canEditOrders, canDeleteOrders } from '../auth.js';
 
@@ -154,6 +154,7 @@ export async function renderOrders(container) {
       </tbody>
     </table>`;
     enableTableSort(el.querySelector('table'));
+    enableColumnResize(el.querySelector('table'));
     if (canDel) enableBulkDelete(el.querySelector('table'), document.getElementById('ord-bulk-del'), async ids => {
       const { error } = await db.from('orders').delete().in('id', ids);
       if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
@@ -628,6 +629,7 @@ function renderItemsTable() {
       </tr>`).join('')}
     </tbody>
   </table>`;
+  enableColumnResize(el.querySelector('table'));
 }
 
 function updateTotals() {

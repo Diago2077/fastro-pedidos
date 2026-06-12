@@ -131,6 +131,13 @@
         <i class="fas fa-sign-out-alt"></i>
       </button>
     </div>
+
+    <div class="sidebar-version">
+      <span class="app-version" id="app-version" title="Versión instalada">v—</span>
+      <button class="btn btn-xs btn-outline" id="force-update-btn" title="Forzar actualización (borra la caché y recarga)">
+        <i class="fas fa-sync-alt"></i> Actualizar
+      </button>
+    </div>
   </aside>
 
   <!-- SIDEBAR OVERLAY (mobile) -->
@@ -173,6 +180,13 @@
 <!-- ========== TOASTS ========== -->
 <div id="toast-container"></div>
 
+<!-- ========== AVISO DE NUEVA VERSIÓN ========== -->
+<div id="update-banner" class="update-banner hidden">
+  <span><i class="fas fa-arrow-rotate-right"></i> Hay una nueva versión disponible.</span>
+  <button class="btn btn-sm btn-accent" id="update-now-btn">Actualizar</button>
+  <button class="icon-btn" id="update-dismiss-btn" title="Más tarde"><i class="fas fa-times"></i></button>
+</div>
+
 <!-- ========== SCRIPTS ========== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
@@ -181,11 +195,76 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script type="module" src="js/app.js"></script>
 
-<!-- PWA: registrar service worker -->
+<!-- PWA: registrar service worker + gestor de actualizaciones -->
 <script>
+  // Gestor de actualización expuesto a la app (botón "Actualizar" + banner)
+  window.AppUpdate = {
+    reg: null,
+    updateReady: false,
+
+    // Forzar: des-registra el SW, borra toda la caché y recarga sin caché.
+    // Es la opción "nuclear" para iPads/celulares que se quedan pegados.
+    async force() {
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+        if (window.caches) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+      } catch (e) { /* seguimos igual con la recarga */ }
+      const u = new URL(window.location.href);
+      u.searchParams.set('_v', Date.now());        // rompe la caché HTTP del navegador
+      window.location.replace(u.toString());
+    },
+
+    // Aplicar la versión en espera (cuando el usuario toca "Actualizar" en el banner)
+    applyWaiting() {
+      const w = this.reg && this.reg.waiting;
+      if (w) w.postMessage('SKIP_WAITING');          // el SW activa → controllerchange recarga
+      else window.location.reload();
+    }
+  };
+
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW no registrado:', err));
+    window.addEventListener('load', async () => {
+      try {
+        const reg = await navigator.serviceWorker.register('sw.js');
+        window.AppUpdate.reg = reg;
+
+        const announce = () => {
+          window.AppUpdate.updateReady = true;
+          window.dispatchEvent(new Event('fastro:update-available'));
+        };
+
+        // Ya hay un SW nuevo esperando (entraste y había update pendiente)
+        if (reg.waiting && navigator.serviceWorker.controller) announce();
+
+        // Se descargó un SW nuevo mientras la app estaba abierta
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) announce();
+          });
+        });
+
+        // Revisar updates cada 30 min mientras la app esté abierta
+        setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
+      } catch (err) {
+        console.warn('SW no registrado:', err);
+      }
+    });
+
+    // Recargar al cambiar de SW, pero NO en la primera instalación (sin controller previo)
+    const _hadController = navigator.serviceWorker.controller != null;
+    let _reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (_reloaded || !_hadController) return;
+      _reloaded = true;
+      window.location.reload();
     });
   }
 </script>

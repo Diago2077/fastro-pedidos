@@ -4,7 +4,9 @@
 // la última versión; offline = sirve lo cacheado). Las llamadas a
 // Supabase y CDNs (cross-origin) van SIEMPRE a la red, nunca se cachean.
 // ============================================================
-const CACHE = 'fastro-v1';
+// El nombre de la caché incluye la versión: al cambiarla, el evento
+// 'activate' borra la caché vieja. Mantenelo igual a APP_VERSION (js/version.js).
+const CACHE = 'fastro-v1.0.0';
 
 const SHELL = [
   './',
@@ -12,10 +14,13 @@ const SHELL = [
   './manifest.webmanifest',
   './css/style.css',
   './js/app.js',
+  './js/version.js',
   './js/auth.js',
   './js/supabase.js',
   './js/utils/helpers.js',
   './js/utils/export.js',
+  './js/utils/sizes.js',
+  './js/utils/filters.js',
   './js/modules/dashboard.js',
   './js/modules/clients.js',
   './js/modules/products.js',
@@ -31,12 +36,16 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (event) => {
+  // No llamamos skipWaiting() acá: el SW nuevo queda "en espera" y la app
+  // avisa al usuario para actualizar (evita recargar en medio de un pedido).
   event.waitUntil(
-    caches.open(CACHE)
-      .then((cache) => cache.addAll(SHELL))
-      .then(() => self.skipWaiting())
-      .catch(() => self.skipWaiting()) // si algún archivo falla, igual instala
+    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).catch(() => {})
   );
+});
+
+// La app pide activar el SW en espera cuando el usuario toca "Actualizar".
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {

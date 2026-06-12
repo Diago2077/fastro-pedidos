@@ -7,6 +7,7 @@ import { initAuth, login, logout, isAdmin,
   canViewProducts, canViewProviders, canViewReports } from './auth.js';
 import { avatarInitials, closeModal, toast } from './utils/helpers.js';
 import { loadSizeOrder } from './utils/sizes.js';
+import { APP_VERSION } from './version.js';
 import { renderDashboard }  from './modules/dashboard.js';
 import { renderClients }    from './modules/clients.js';
 import { renderProducts }   from './modules/products.js';
@@ -107,6 +108,9 @@ function showApp(user) {
   document.getElementById('sidebar-user-name').textContent = user.name;
   document.getElementById('sidebar-user-role').textContent = user.role === 'admin' ? 'Administrador' : 'Usuario';
 
+  // Versión + actualización (PWA)
+  setupUpdateUI();
+
   // Show/hide nav items based on permissions
   document.querySelectorAll('.nav-link[data-section]').forEach(link => {
     const section = link.dataset.section;
@@ -200,6 +204,30 @@ function navigate(section) {
   const content = document.getElementById('content-area');
   content.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin fa-2x"></i></div>`;
   sections[section].render(content);
+}
+
+// ============================================================
+// VERSIÓN + ACTUALIZACIÓN (PWA)
+// ============================================================
+function setupUpdateUI() {
+  // Mostrar la versión instalada
+  const verEl = document.getElementById('app-version');
+  if (verEl) verEl.textContent = 'v' + APP_VERSION;
+
+  // Botón "Actualizar" del menú = forzar (borra caché + recarga)
+  document.getElementById('force-update-btn')?.addEventListener('click', async () => {
+    toast('Actualizando…');
+    await window.AppUpdate?.force();
+  });
+
+  // Banner cuando hay una versión nueva en espera
+  const banner = document.getElementById('update-banner');
+  const showBanner = () => banner?.classList.remove('hidden');
+  if (window.AppUpdate?.updateReady) showBanner();
+  window.addEventListener('fastro:update-available', showBanner);
+
+  document.getElementById('update-now-btn')?.addEventListener('click', () => window.AppUpdate?.applyWaiting());
+  document.getElementById('update-dismiss-btn')?.addEventListener('click', () => banner?.classList.add('hidden'));
 }
 
 function syncThemeIcon() {

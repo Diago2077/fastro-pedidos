@@ -585,6 +585,40 @@ select.form-control { cursor: pointer; }
 }
 .col-resizer:hover { background: rgba(155,0,0,.3); }
 
+/* ============================================================
+   LISTAS CON BÚSQUEDA / FILTRO / ENCABEZADOS FIJOS
+   En las vistas de lista (un único .card con tabla), la tarjeta ocupa el
+   alto disponible y la tabla scrollea por dentro. Así la barra de búsqueda
+   y filtros (.card-header) y los títulos de columna (thead) quedan fijos
+   arriba mientras se recorren las filas.
+   ============================================================ */
+.content-area:has(> .card > .table-responsive) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.content-area:has(> .card > .table-responsive) > .card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.content-area:has(> .card > .table-responsive) > .card > .card-header {
+  flex-shrink: 0;
+}
+.content-area:has(> .card > .table-responsive) > .card > .table-responsive {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;            /* scroll vertical (y horizontal) dentro de la tabla */
+}
+/* Encabezado de columnas pegado al borde superior del scroll de la tabla */
+.content-area:has(> .card > .table-responsive) thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  box-shadow: inset 0 -1px 0 var(--border);  /* conserva el borde inferior al scrollear */
+}
+
 .td-actions { text-align: right; white-space: nowrap; }
 .td-actions .btn { vertical-align: middle; }
 .td-actions .btn + .btn { margin-left: 4px; }

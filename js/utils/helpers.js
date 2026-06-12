@@ -302,7 +302,13 @@ export function enableColumnResize(table) {
     if (!table.isConnected) return;
     const widths = ths.map(th => th.offsetWidth);
     table.style.tableLayout = 'fixed';
-    ths.forEach((th, i) => { th.style.width = widths[i] + 'px'; th.style.position = 'relative'; });
+    // La manija (.col-resizer) es absolute y necesita un th posicionado. En las
+    // listas el th ya es position:sticky (encabezado fijo) — no lo pisamos; solo
+    // ponemos relative cuando el th sigue siendo estático (ej. tablas de modal).
+    ths.forEach((th, i) => {
+      th.style.width = widths[i] + 'px';
+      if (getComputedStyle(th).position === 'static') th.style.position = 'relative';
+    });
 
     const fit = () => {
       const sum = ths.reduce((a, th) => a + (parseFloat(th.style.width) || th.offsetWidth), 0);

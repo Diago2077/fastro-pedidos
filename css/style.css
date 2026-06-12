@@ -945,7 +945,7 @@ select.form-control { cursor: pointer; }
   justify-content: space-between;
 }
 .product-grid-table th { text-align: center; }
-.product-grid-table .sz-price { font-size: .75em; color: var(--accent); font-weight: 700; }
+.product-grid-table .sz-price { font-size: .92em; color: var(--accent); font-weight: 700; }
 .cell-na { text-align: center; background: var(--border-light); color: var(--text-light); }
 .product-grid-table.table-sm td { padding: 5px 6px; }
 

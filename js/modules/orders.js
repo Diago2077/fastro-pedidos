@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, fCurrency, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes } from '../utils/sizes.js';
 import { getSession, isAdmin, canExportExcel, canCreateOrders, canEditOrders, canDeleteOrders } from '../auth.js';
@@ -500,7 +500,7 @@ function showProductGrid(product) {
 
   const priceRow = sizes.map(s => {
     const anyVar = variants.find(v => v.size === s);
-    return `<th class="text-center"><div>${esc(s)}</div><div class="sz-price">${fCurrency(anyVar?.sale_price || 0)}</div></th>`;
+    return `<th class="text-center"><div>${esc(s)}</div><div class="sz-price">${fNum(anyVar?.sale_price || 0)}</div></th>`;
   }).join('');
 
   // Build a lookup of existing quantities already in the order

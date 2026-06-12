@@ -51,19 +51,16 @@ export async function renderClients(container) {
     if (!rows.length) { el.innerHTML = emptyState('No hay clientes registrados'); return; }
     const canDel = canDeleteClients();
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr>${canDel ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Código</th><th>Nombre</th><th>Tienda</th><th>RUC</th><th>Teléfono</th><th>Ciudad</th><th>Correo</th><th></th></tr></thead>
+      <thead><tr>${canDel ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Código</th><th>Nombre</th><th>Tienda</th><th>Ciudad</th><th></th></tr></thead>
       <tbody>
         ${rows.map(c => `<tr>
           ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${c.id}"></td>` : ''}
           <td><strong>${c.code ?? '–'}</strong></td>
           <td>${esc(c.name)}</td>
           <td>${esc(c.store_name || '–')}</td>
-          <td>${esc(c.ruc || '–')}</td>
-          <td>${esc(c.phone || '–')}</td>
           <td>${esc(c.city || '–')}</td>
-          <td>${esc(c.email || '–')}</td>
           <td class="td-actions">
-            ${canEditClients() ? `<button class="btn btn-xs btn-outline" onclick="window._cl.form('${c.id}')"><i class="fas fa-edit"></i></button>` : ''}
+            <button class="btn btn-xs btn-outline" title="Ver detalle" onclick="window._cl.view('${c.id}')"><i class="fas fa-eye"></i> Ver</button>
           </td>
         </tr>`).join('')}
       </tbody>
@@ -114,7 +111,29 @@ export async function renderClients(container) {
     </form>`;
   }
 
+  function detailHTML(c) {
+    const row = (label, val) =>
+      `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${esc(val == null || val === '' ? '–' : String(val))}</span></div>`;
+    return `<div class="client-detail">
+      ${row('Código', c.code)}
+      ${row('Nombre', c.name)}
+      ${row('Tienda', c.store_name)}
+      ${row('RUC', c.ruc)}
+      ${row('Teléfono', c.phone)}
+      ${row('Ciudad', c.city)}
+      ${row('Correo', c.email)}
+    </div>
+    <div class="form-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
+      ${canEditClients() ? `<button type="button" class="btn btn-accent" onclick="window._cl.form('${c.id}')"><i class="fas fa-edit"></i> Editar</button>` : ''}
+    </div>`;
+  }
+
   window._cl = {
+    async view(id) {
+      const { data } = await db.from('clients').select('*').eq('id', id).single();
+      openModal('Detalle del Cliente', detailHTML(data || {}));
+    },
     async form(id) {
       let c = {};
       if (id) { const { data } = await db.from('clients').select('*').eq('id', id).single(); c = data || {}; }

@@ -1113,6 +1113,25 @@ select.form-control { cursor: pointer; }
   color: var(--text);
 }
 
+/* Detalle de cliente (modal "Ver") */
+.client-detail { display: flex; flex-direction: column; gap: 2px; }
+.detail-row {
+  display: flex;
+  gap: 12px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-label {
+  flex: 0 0 110px;
+  font-size: .82em;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.detail-value { flex: 1; word-break: break-word; }
+
 /* Filtro multi-selección (popover) */
 .filter-anchor { position: relative; display: inline-flex; }
 .filter-popover {

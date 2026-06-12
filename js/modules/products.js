@@ -102,7 +102,7 @@ export async function renderProducts(container) {
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay productos registrados'); return; }
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr>${_canDelete ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Código</th><th>Descripción</th><th>Marca</th><th>Proveedor</th><th>Temporada</th><th>Tallas</th><th class="text-end">Precio Venta</th><th></th></tr></thead>
+      <thead><tr>${_canDelete ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Código</th><th>Descripción</th><th>Marca</th><th>Tallas</th><th class="text-end">Precio Venta</th><th></th></tr></thead>
       <tbody>
         ${rows.map(p => {
           const variants = p.product_variants || [];
@@ -126,8 +126,6 @@ export async function renderProducts(container) {
             <td><strong>${esc(p.code)}</strong></td>
             <td>${esc(p.description)}</td>
             <td>${esc(p.brand || '–')}</td>
-            <td>${esc(p.providers?.name || '–')}</td>
-            <td>${esc(p.season || '–')}</td>
             <td><span class="text-muted small">${esc(sizes)}</span></td>
             <td class="text-end">${priceLabel}</td>
             ${actions}

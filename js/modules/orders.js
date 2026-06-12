@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, confirmDialog, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -272,7 +272,13 @@ async function openOrderModal(orderId, onSavedFn) {
   openModal(orderId ? `Pedido ${order.order_number}` : 'Nuevo Pedido', html, {
     size: 'xl',
     // Avisar antes de cerrar (X / Cancelar / fondo) si hay cambios sin guardar
-    guard: () => !_state.dirty || window.confirm('Tenés cambios sin guardar en el pedido. Si salís, se perderán los productos agregados. ¿Salir igual?'),
+    guard: () => !_state.dirty || confirmDialog({
+      title: 'Cambios sin guardar',
+      message: 'Tenés productos agregados al pedido que se perderán si salís sin guardar.',
+      confirmText: 'Salir sin guardar',
+      cancelText: 'Seguir editando',
+      danger: true,
+    }),
     onClose: () => {
       window.removeEventListener('beforeunload', beforeUnload);
       // Cierre deliberado de un pedido NUEVO (guardar o confirmar salida): el

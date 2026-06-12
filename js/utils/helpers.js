@@ -35,9 +35,14 @@ export function openModal(title, bodyHTML, { size = 'md', onClose, guard } = {})
   _modalGuard = guard || null;
 }
 
-// force=true cierra sin consultar el guard (ej. tras guardar correctamente)
-export function closeModal(force = false) {
-  if (!force && _modalGuard && !_modalGuard()) return;
+// force=true cierra sin consultar el guard (ej. tras guardar correctamente).
+// El guard puede ser síncrono (boolean) o asíncrono (Promise<boolean>), p. ej.
+// cuando muestra un confirmDialog propio para "salir sin guardar".
+export async function closeModal(force = false) {
+  if (!force && _modalGuard) {
+    const ok = await _modalGuard();
+    if (!ok) return;
+  }
   _modalGuard = null;
   document.getElementById('modal').classList.add('hidden');
   document.getElementById('modal-backdrop').classList.add('hidden');
@@ -71,9 +76,64 @@ export function statusBadge(s) {
   return `<span class="badge badge-${type}">${label}</span>`;
 }
 
-// --- Confirm ---
+// --- Confirm con diseño propio (reemplaza window.confirm) ---
+// Devuelve una Promise<boolean>. Acepta un string (mensaje) o un objeto:
+//   { title, message, confirmText, cancelText, danger, icon }
+// Se monta por encima de cualquier modal abierto (z-index alto).
+export function confirmDialog(opts = {}) {
+  const o = typeof opts === 'string' ? { title: opts } : opts;
+  const {
+    title = '¿Confirmar?',
+    message = '',
+    confirmText = 'Aceptar',
+    cancelText = 'Cancelar',
+    danger = false,
+    icon = danger ? 'triangle-exclamation' : 'circle-question',
+  } = o;
+
+  return new Promise(resolve => {
+    const back = document.createElement('div');
+    back.className = 'cdialog-backdrop';
+    back.innerHTML = `
+      <div class="cdialog" role="alertdialog" aria-modal="true">
+        <div class="cdialog-icon ${danger ? 'is-danger' : 'is-info'}">
+          <i class="fas fa-${icon}"></i>
+        </div>
+        <h4 class="cdialog-title">${esc(title)}</h4>
+        ${message ? `<p class="cdialog-msg">${esc(message)}</p>` : ''}
+        <div class="cdialog-actions">
+          <button type="button" class="btn btn-secondary cdialog-cancel">${esc(cancelText)}</button>
+          <button type="button" class="btn ${danger ? 'btn-danger' : 'btn-accent'} cdialog-ok">${esc(confirmText)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    requestAnimationFrame(() => back.classList.add('show'));
+
+    let done = false;
+    const close = (val) => {
+      if (done) return;
+      done = true;
+      back.classList.remove('show');
+      document.removeEventListener('keydown', onKey);
+      setTimeout(() => back.remove(), 180);
+      resolve(val);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); close(false); }
+      else if (e.key === 'Enter') { e.preventDefault(); close(true); }
+    };
+    back.querySelector('.cdialog-cancel').onclick = () => close(false);
+    back.querySelector('.cdialog-ok').onclick = () => close(true);
+    back.addEventListener('mousedown', e => { if (e.target === back) close(false); });
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => back.querySelector('.cdialog-ok')?.focus(), 60);
+  });
+}
+
+// Compat: las llamadas existentes pasan un mensaje (pregunta) corto. Lo
+// mostramos como título del diálogo, con estética de acción destructiva.
 export function confirm2(msg) {
-  return new Promise(r => r(window.confirm(msg)));
+  return confirmDialog({ title: msg, danger: true, confirmText: 'Sí', cancelText: 'No' });
 }
 
 // --- Loading button ---

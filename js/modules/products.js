@@ -102,11 +102,10 @@ export async function renderProducts(container) {
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay productos registrados'); return; }
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr>${_canDelete ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Código</th><th>Descripción</th><th>Marca</th><th>Proveedor</th><th>Temporada</th><th>Colores</th><th>Tallas</th><th class="text-end">Precio Venta</th><th></th></tr></thead>
+      <thead><tr>${_canDelete ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Código</th><th>Descripción</th><th>Marca</th><th>Proveedor</th><th>Temporada</th><th>Tallas</th><th class="text-end">Precio Venta</th><th></th></tr></thead>
       <tbody>
         ${rows.map(p => {
           const variants = p.product_variants || [];
-          const colors = [...new Set(variants.map(v => v.color))].join(', ') || '–';
 
           // Agrupar tallas por precio: una fila por cada precio distinto
           const byPrice = new Map();
@@ -129,7 +128,6 @@ export async function renderProducts(container) {
             <td>${esc(p.brand || '–')}</td>
             <td>${esc(p.providers?.name || '–')}</td>
             <td>${esc(p.season || '–')}</td>
-            <td><span class="text-muted small">${esc(colors)}</span></td>
             <td><span class="text-muted small">${esc(sizes)}</span></td>
             <td class="text-end">${priceLabel}</td>
             ${actions}
@@ -559,6 +557,7 @@ export function openImportModal(reloadFn) {
   });
 
   let _parsedRows = [];
+  let _conflicts = [];   // códigos que ya existen con OTRA marca
 
   function handleFile(file) {
     if (!file) return;
@@ -580,10 +579,55 @@ export function openImportModal(reloadFn) {
     reader.readAsArrayBuffer(file);
   }
 
-  function showPreview(rows) {
-    const uniqueProducts = [...new Set(rows.map(r => r.code))].length;
+  async function showPreview(rows) {
+    const codes = [...new Set(rows.map(r => r.code))];
+
+    // --- Control de colisión de códigos por marca ---
+    // Si un código ya existe pero con una marca distinta a la del archivo, lo marcamos
+    // como conflicto para avisar antes de reemplazar (misma marca = actualizar es OK).
+    _conflicts = [];
+    if (codes.length) {
+      const incomingBrand = {};
+      rows.forEach(r => { if (incomingBrand[r.code] === undefined) incomingBrand[r.code] = (r.brand || '').trim(); });
+      const { data: existing } = await db.from('products').select('code, brand').in('code', codes);
+      const norm = s => String(s || '').trim().toLowerCase();
+      (existing || []).forEach(p => {
+        const oldB = (p.brand || '').trim();
+        const newB = incomingBrand[p.code] || '';
+        if (oldB && newB && norm(oldB) !== norm(newB)) {
+          _conflicts.push({ code: p.code, oldBrand: oldB, newBrand: newB });
+        }
+      });
+    }
+
+    const uniqueProducts = codes.length;
     const summary = document.getElementById('import-summary');
-    summary.innerHTML = `
+    const conflictHTML = _conflicts.length ? `
+      <div class="import-conflict-box">
+        <div class="import-conflict-title">
+          <i class="fas fa-exclamation-triangle"></i>
+          ${_conflicts.length} código(s) ya existen con <u>otra marca</u>
+        </div>
+        <div class="table-responsive" style="max-height:160px;overflow-y:auto">
+          <table class="table table-sm" style="font-size:.82em;margin:8px 0">
+            <thead><tr><th>Código</th><th>Marca actual</th><th>Marca en archivo</th></tr></thead>
+            <tbody>
+              ${_conflicts.map(c => `<tr>
+                <td><strong>${esc(c.code)}</strong></td>
+                <td>${esc(c.oldBrand)}</td>
+                <td>${esc(c.newBrand)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+        <label class="import-conflict-check">
+          <input type="checkbox" id="import-replace-conflicts">
+          <span>Reemplazar igual estos productos (cambiar su marca)</span>
+        </label>
+        <p class="import-conflict-note">Si lo dejás <strong>sin marcar</strong>, esos códigos se <strong>omiten</strong> y el resto se importa normal.</p>
+      </div>` : '';
+
+    summary.innerHTML = conflictHTML + `
       <div class="import-summary-box">
         <span><i class="fas fa-boxes"></i> <strong>${uniqueProducts}</strong> productos</span>
         <span><i class="fas fa-layer-group"></i> <strong>${rows.length}</strong> variantes</span>
@@ -611,10 +655,28 @@ export function openImportModal(reloadFn) {
   document.getElementById('btn-confirm-import')?.addEventListener('click', async () => {
     if (!_parsedRows.length) return;
     const btn = document.getElementById('btn-confirm-import');
+
+    // Conflictos de marca: si no se marcó "reemplazar igual", se omiten esos códigos.
+    let rowsToImport = _parsedRows;
+    let skipped = 0;
+    if (_conflicts.length) {
+      const replace = document.getElementById('import-replace-conflicts')?.checked;
+      if (!replace) {
+        const conflictCodes = new Set(_conflicts.map(c => c.code));
+        rowsToImport = _parsedRows.filter(r => !conflictCodes.has(r.code));
+        skipped = _conflicts.length;
+        if (!rowsToImport.length) {
+          toast('No hay nada para importar: todos los códigos tienen una marca distinta. Marcá "Reemplazar igual" si querés cambiar su marca.', 'warning', 5000);
+          return;
+        }
+      }
+    }
+
     setLoading(btn, true);
     try {
-      const result = await executeImport(_parsedRows);
-      toast(`Importación completa: ${result.created} nuevos, ${result.updated} actualizados${result.errors > 0 ? `, ${result.errors} con errores (ver detalle en la consola)` : ''}`, result.errors > 0 ? 'warning' : 'success', 5000);
+      const result = await executeImport(rowsToImport);
+      const skipMsg = skipped ? `, ${skipped} omitido(s) por marca distinta` : '';
+      toast(`Importación completa: ${result.created} nuevos, ${result.updated} actualizados${skipMsg}${result.errors > 0 ? `, ${result.errors} con errores (ver detalle en la consola)` : ''}`, (result.errors > 0 || skipped) ? 'warning' : 'success', 5000);
       closeModal();
       reloadFn();
     } catch (err) {

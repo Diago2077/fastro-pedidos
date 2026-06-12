@@ -1074,6 +1074,46 @@ select.form-control { cursor: pointer; }
   color: var(--text);
 }
 
+/* Aviso de conflicto de marca al importar */
+.import-conflict-box {
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: #fffaf0;
+  border: 1px solid #f6ad55;
+  border-left: 4px solid #dd6b20;
+  border-radius: var(--radius);
+  color: var(--text);
+}
+.import-conflict-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #c05621;
+}
+.import-conflict-title i { color: #dd6b20; }
+.import-conflict-box .table { margin-bottom: 0; }
+.import-conflict-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 4px;
+}
+.import-conflict-check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.import-conflict-note {
+  margin: 6px 0 0;
+  font-size: .82em;
+  color: var(--text-muted);
+}
+[data-theme="dark"] .import-conflict-box {
+  background: rgba(221,107,32,.12);
+  border-color: rgba(246,173,85,.5);
+  border-left-color: #dd6b20;
+}
+[data-theme="dark"] .import-conflict-title { color: #f6ad55; }
+
 /* Aviso "crear usuario en el panel" */
 .user-create-hint {
   display: flex;

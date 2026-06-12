@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, confirmDialog, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, confirmDialog, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -165,36 +165,38 @@ export async function renderOrders(container) {
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay pedidos'); return; }
     const canDel = canDeleteOrders();
+    const rowsHTML = rows.map(o => {
+      const sub = totByOrder[o.id] || 0;
+      const tot = sub * (1 - (o.discount_pct || 0) / 100);
+      return `<tr>
+        ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${o.id}"></td>` : ''}
+        <td><strong>${esc(o.order_number)}</strong></td>
+        <td>${esc(o.clients?.name || '–')}</td>
+        <td>${esc(o.users?.name || '–')}</td>
+        <td>${esc(o.providers?.name || '–')}</td>
+        <td>${esc(o.season || '–')}</td>
+        <td>${fCurrency(tot)}</td>
+        <td><button class="status-btn status-${o.status}" onclick="window._ord.changeStatus('${o.id}','${o.status}')">${STATUS_LABELS[o.status] || o.status}</button></td>
+        <td>${fDate(o.created_at)}</td>
+        <td class="td-actions">
+          <button class="btn btn-xs btn-outline" title="Ver / Editar" onclick="window._ord.open('${o.id}')"><i class="fas fa-eye"></i></button>
+        </td>
+      </tr>`;
+    });
+
     el.innerHTML = `<table class="table table-hover">
       <thead><tr>${canDel ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>N° Pedido</th><th>Cliente</th><th>Vendedor</th><th>Proveedor</th><th>Temporada</th><th>Total</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
-      <tbody>
-        ${rows.map(o => {
-          const sub = totByOrder[o.id] || 0;
-          const tot = sub * (1 - (o.discount_pct || 0) / 100);
-          return `<tr>
-            ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${o.id}"></td>` : ''}
-            <td><strong>${esc(o.order_number)}</strong></td>
-            <td>${esc(o.clients?.name || '–')}</td>
-            <td>${esc(o.users?.name || '–')}</td>
-            <td>${esc(o.providers?.name || '–')}</td>
-            <td>${esc(o.season || '–')}</td>
-            <td>${fCurrency(tot)}</td>
-            <td><button class="status-btn status-${o.status}" onclick="window._ord.changeStatus('${o.id}','${o.status}')">${STATUS_LABELS[o.status] || o.status}</button></td>
-            <td>${fDate(o.created_at)}</td>
-            <td class="td-actions">
-              <button class="btn btn-xs btn-outline" title="Ver / Editar" onclick="window._ord.open('${o.id}')"><i class="fas fa-eye"></i></button>
-            </td>
-          </tr>`;
-        }).join('')}
-      </tbody>
+      <tbody></tbody>
     </table>`;
-    enableTableSort(el.querySelector('table'));
-    enableColumnResize(el.querySelector('table'));
-    if (canDel) enableBulkDelete(el.querySelector('table'), document.getElementById('ord-bulk-del'), async ids => {
+    const table = el.querySelector('table');
+    const lazy = lazyRenderRows(table, rowsHTML);
+    enableTableSort(table, { onBeforeSort: lazy.renderAll });
+    enableColumnResize(table);
+    if (canDel) enableBulkDelete(table, document.getElementById('ord-bulk-del'), async ids => {
       const { error } = await db.from('orders').delete().in('id', ids);
       if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
       toast(`${ids.length} pedido(s) eliminado(s)`); load();
-    });
+    }, { onBeforeSelectAll: lazy.renderAll });
   }
 
   // Use Object.assign so updateQty / removeItem defined at module level are not overwritten

@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateClients, canEditClients, canDeleteClients } from '../auth.js';
 
@@ -52,28 +52,30 @@ export async function renderClients(container) {
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay clientes registrados'); return; }
     const canDel = canDeleteClients();
+    const rowsHTML = rows.map(c => `<tr>
+      ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${c.id}"></td>` : ''}
+      <td><strong>${c.code ?? '–'}</strong></td>
+      <td>${esc(c.name)}</td>
+      <td>${esc(c.store_name || '–')}</td>
+      <td>${esc(c.city || '–')}</td>
+      <td class="td-actions">
+        <button class="btn btn-xs btn-outline" title="Ver detalle" onclick="window._cl.view('${c.id}')"><i class="fas fa-eye"></i> Ver</button>
+      </td>
+    </tr>`);
+
     el.innerHTML = `<table class="table table-hover">
       <thead><tr>${canDel ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Código</th><th>Nombre</th><th>Tienda</th><th>Ciudad</th><th></th></tr></thead>
-      <tbody>
-        ${rows.map(c => `<tr>
-          ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${c.id}"></td>` : ''}
-          <td><strong>${c.code ?? '–'}</strong></td>
-          <td>${esc(c.name)}</td>
-          <td>${esc(c.store_name || '–')}</td>
-          <td>${esc(c.city || '–')}</td>
-          <td class="td-actions">
-            <button class="btn btn-xs btn-outline" title="Ver detalle" onclick="window._cl.view('${c.id}')"><i class="fas fa-eye"></i> Ver</button>
-          </td>
-        </tr>`).join('')}
-      </tbody>
+      <tbody></tbody>
     </table>`;
-    enableTableSort(el.querySelector('table'));
-    enableColumnResize(el.querySelector('table'));
-    if (canDel) enableBulkDelete(el.querySelector('table'), document.getElementById('cl-bulk-del'), async ids => {
+    const table = el.querySelector('table');
+    const lazy = lazyRenderRows(table, rowsHTML);
+    enableTableSort(table, { onBeforeSort: lazy.renderAll });
+    enableColumnResize(table);
+    if (canDel) enableBulkDelete(table, document.getElementById('cl-bulk-del'), async ids => {
       const { error } = await db.from('clients').update({ active: false }).in('id', ids);
       if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
       toast(`${ids.length} cliente(s) eliminado(s)`); load();
-    });
+    }, { onBeforeSelectAll: lazy.renderAll });
   }
 
   function formHTML(c = {}) {

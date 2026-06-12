@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, esc, enableTableSort, enableColumnResize } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, esc, enableTableSort, enableColumnResize, lazyRenderRows } from '../utils/helpers.js';
 import { getSession } from '../auth.js';
 
 export async function renderUsers(container) {
@@ -27,25 +27,27 @@ export async function renderUsers(container) {
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay usuarios'); return; }
     const currentId = getSession()?.id;
+    const rowsHTML = rows.map(u => `<tr>
+      <td><strong>${esc(u.name || '—')}</strong>${u.id === currentId ? ' <span class="badge badge-info">Yo</span>' : ''}</td>
+      <td>${esc(u.email)}</td>
+      <td><span class="badge ${u.role === 'admin' ? 'badge-danger' : 'badge-secondary'}">${u.role === 'admin' ? 'Admin' : 'Usuario'}</span></td>
+      <td><span class="badge ${u.active ? 'badge-success' : 'badge-secondary'}">${u.active ? 'Activo' : 'Inactivo'}</span></td>
+      <td>${new Date(u.created_at).toLocaleDateString('es-PY')}</td>
+      <td class="td-actions">
+        <button class="btn btn-xs btn-outline" onclick="window._usr.form('${u.id}')"><i class="fas fa-edit"></i></button>
+        ${u.id !== currentId ? `<button class="btn btn-xs btn-danger-outline" onclick="window._usr.toggle('${u.id}', ${u.active})">
+          <i class="fas fa-${u.active ? 'ban' : 'check'}"></i></button>` : ''}
+      </td>
+    </tr>`);
+
     el.innerHTML = `<table class="table table-hover">
       <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Creado</th><th></th></tr></thead>
-      <tbody>
-        ${rows.map(u => `<tr>
-          <td><strong>${esc(u.name || '—')}</strong>${u.id === currentId ? ' <span class="badge badge-info">Yo</span>' : ''}</td>
-          <td>${esc(u.email)}</td>
-          <td><span class="badge ${u.role === 'admin' ? 'badge-danger' : 'badge-secondary'}">${u.role === 'admin' ? 'Admin' : 'Usuario'}</span></td>
-          <td><span class="badge ${u.active ? 'badge-success' : 'badge-secondary'}">${u.active ? 'Activo' : 'Inactivo'}</span></td>
-          <td>${new Date(u.created_at).toLocaleDateString('es-PY')}</td>
-          <td class="td-actions">
-            <button class="btn btn-xs btn-outline" onclick="window._usr.form('${u.id}')"><i class="fas fa-edit"></i></button>
-            ${u.id !== currentId ? `<button class="btn btn-xs btn-danger-outline" onclick="window._usr.toggle('${u.id}', ${u.active})">
-              <i class="fas fa-${u.active ? 'ban' : 'check'}"></i></button>` : ''}
-          </td>
-        </tr>`).join('')}
-      </tbody>
+      <tbody></tbody>
     </table>`;
-    enableTableSort(el.querySelector('table'));
-    enableColumnResize(el.querySelector('table'));
+    const table = el.querySelector('table');
+    const lazy = lazyRenderRows(table, rowsHTML);
+    enableTableSort(table, { onBeforeSort: lazy.renderAll });
+    enableColumnResize(table);
   }
 
   function formHTML(u = {}) {

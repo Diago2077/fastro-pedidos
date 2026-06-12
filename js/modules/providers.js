@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateProviders, canEditProviders, canDeleteProviders } from '../auth.js';
 
@@ -39,26 +39,28 @@ export async function renderProviders(container) {
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay proveedores registrados'); return; }
     const canDel = canDeleteProviders();
+    const rowsHTML = rows.map(p => `<tr>
+      ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${p.id}"></td>` : ''}
+      <td><strong>${esc(p.name)}</strong></td>
+      <td>${new Date(p.created_at).toLocaleDateString('es-PY')}</td>
+      <td class="td-actions">
+        ${canEditProviders() ? `<button class="btn btn-xs btn-outline" onclick="window._pv.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
+      </td>
+    </tr>`);
+
     el.innerHTML = `<table class="table table-hover">
       <thead><tr>${canDel ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Nombre</th><th>Fecha de registro</th><th></th></tr></thead>
-      <tbody>
-        ${rows.map(p => `<tr>
-          ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${p.id}"></td>` : ''}
-          <td><strong>${esc(p.name)}</strong></td>
-          <td>${new Date(p.created_at).toLocaleDateString('es-PY')}</td>
-          <td class="td-actions">
-            ${canEditProviders() ? `<button class="btn btn-xs btn-outline" onclick="window._pv.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
-          </td>
-        </tr>`).join('')}
-      </tbody>
+      <tbody></tbody>
     </table>`;
-    enableTableSort(el.querySelector('table'));
-    enableColumnResize(el.querySelector('table'));
-    if (canDel) enableBulkDelete(el.querySelector('table'), document.getElementById('pv-bulk-del'), async ids => {
+    const table = el.querySelector('table');
+    const lazy = lazyRenderRows(table, rowsHTML);
+    enableTableSort(table, { onBeforeSort: lazy.renderAll });
+    enableColumnResize(table);
+    if (canDel) enableBulkDelete(table, document.getElementById('pv-bulk-del'), async ids => {
       const { error } = await db.from('providers').update({ active: false }).in('id', ids);
       if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
       toast(`${ids.length} proveedor(es) eliminado(s)`); load();
-    });
+    }, { onBeforeSelectAll: lazy.renderAll });
   }
 
   function formHTML(p = {}) {

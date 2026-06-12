@@ -213,13 +213,16 @@ function _cellSortValue(td) {
 
 // Habilita el ordenamiento por click en los <th> de una tabla.
 // Las columnas vacías (acciones) o con clase .no-sort se omiten.
-export function enableTableSort(table) {
+// onBeforeSort: callback opcional que se ejecuta antes de ordenar (ej. con
+// render por tramos, fuerza a renderizar TODAS las filas para ordenarlas bien).
+export function enableTableSort(table, { onBeforeSort } = {}) {
   if (!table || !table.tHead) return;
   const ths = [...table.tHead.rows[0].cells];
   ths.forEach((th, idx) => {
     if (!th.textContent.trim() || th.classList.contains('no-sort')) return;
     th.classList.add('sortable-th');
     th.addEventListener('click', () => {
+      if (onBeforeSort) onBeforeSort();
       const dir = th.dataset.dir === 'asc' ? 'desc' : 'asc';
       ths.forEach(h => { h.removeAttribute('data-dir'); h.querySelectorAll('.sort-arrow').forEach(a => a.remove()); });
       th.dataset.dir = dir;
@@ -240,6 +243,64 @@ export function enableTableSort(table) {
   });
 }
 
+// --- Render por tramos (infinite scroll dentro de la tabla) ---
+// En vez de inyectar miles de <tr> de una, va agregando filas a medida que se
+// scrollea el contenedor (.table-responsive), usando un IntersectionObserver
+// sobre la última fila renderizada. Mantiene todo en memoria para poder
+// renderizar el resto al instante (ordenar, seleccionar todo).
+//
+// table:    <table> ya en el DOM, con <thead> y un <tbody> (se vacía).
+// rowsHTML: array de strings; cada string es el/los <tr> de un ítem.
+// Devuelve { renderAll } para forzar el render completo cuando haga falta.
+export function lazyRenderRows(table, rowsHTML, { batch = 50, root } = {}) {
+  const tbody = table.tBodies[0] || table.appendChild(document.createElement('tbody'));
+  tbody.innerHTML = '';
+  const scroller = root || table.closest('.table-responsive') || table.parentElement;
+  let i = 0;
+  let onScroll = null;
+
+  function appendNext() {
+    if (i >= rowsHTML.length) return false;
+    const end = Math.min(i + batch, rowsHTML.length);
+    tbody.insertAdjacentHTML('beforeend', rowsHTML.slice(i, end).join(''));
+    i = end;
+    return true;
+  }
+  function stop() {
+    if (onScroll && scroller) scroller.removeEventListener('scroll', onScroll);
+    onScroll = null;
+  }
+  function renderAll() {
+    stop();
+    if (i < rowsHTML.length) {
+      tbody.insertAdjacentHTML('beforeend', rowsHTML.slice(i).join(''));
+      i = rowsHTML.length;
+    }
+  }
+  // Mientras falte una pantalla para llegar al fondo, cargá el siguiente tramo.
+  function topUp() {
+    if (!scroller) { renderAll(); return; }
+    let guard = 0;
+    while (i < rowsHTML.length &&
+           scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 350 &&
+           guard++ < 200) {
+      appendNext();
+    }
+    if (i >= rowsHTML.length) stop();
+  }
+
+  appendNext();            // primer tramo
+  if (i < rowsHTML.length && scroller) {
+    onScroll = () => topUp();
+    scroller.addEventListener('scroll', onScroll, { passive: true });
+    topUp();               // rellena hasta que aparezca scroll (o se acabe)
+  } else if (i < rowsHTML.length) {
+    renderAll();
+  }
+
+  return { renderAll };
+}
+
 // --- Selección múltiple + eliminar en lote ---
 // tableEl: la <table> que contiene un checkbox .chk-all en el encabezado
 //          y un .row-chk[value="<id>"] por fila.
@@ -248,7 +309,7 @@ export function enableTableSort(table) {
 // onDelete: async (ids[]) => { ...borra y recarga la lista... }
 // Soporta varias filas con el mismo value (ej. un producto con varias
 // filas de precio): se sincronizan y se cuentan como un solo registro.
-export function enableBulkDelete(tableEl, bulkBtn, onDelete) {
+export function enableBulkDelete(tableEl, bulkBtn, onDelete, { onBeforeSelectAll } = {}) {
   if (!tableEl || !bulkBtn) return;
   const all = tableEl.querySelector('.chk-all');
   const rowChks = () => [...tableEl.querySelectorAll('.row-chk')];
@@ -266,6 +327,9 @@ export function enableBulkDelete(tableEl, bulkBtn, onDelete) {
   }
 
   all?.addEventListener('change', () => {
+    // Con render por tramos, "seleccionar todo" debe abarcar TODAS las filas:
+    // forzamos el render completo antes de marcar.
+    if (all.checked && onBeforeSelectAll) onBeforeSelectAll();
     rowChks().forEach(c => { c.checked = all.checked; });
     refresh();
   });

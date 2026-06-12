@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, fNum, enableTableSort, enableBulkDelete, enableColumnResize, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, fNum, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes, compareSize } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -140,53 +140,56 @@ export async function renderProducts(container) {
     const el = document.getElementById('pr-tbl');
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay productos registrados'); return; }
+    // Una entrada por producto (cada producto puede generar varias <tr>, una por precio)
+    const rowsHTML = rows.map(p => {
+      const variants = p.product_variants || [];
+
+      // Agrupar tallas por precio: una fila por cada precio distinto.
+      // Tallas ordenadas según Configuración; los grupos también según ese orden.
+      const byPrice = new Map();
+      variants.forEach(v => {
+        const key = v.sale_price ?? 0;
+        if (!byPrice.has(key)) byPrice.set(key, new Set());
+        byPrice.get(key).add(v.size);
+      });
+      const groups = [...byPrice.entries()]
+        .map(([price, sizeSet]) => ({ price, sizes: sortSizes([...sizeSet]) }))
+        .sort((a, b) => compareSize(a.sizes[0], b.sizes[0]));
+
+      const checkCell = _canDelete ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${p.id}"></td>` : '';
+      const actions = `<td class="td-actions">
+          ${_canEdit ? `<button class="btn btn-xs btn-outline" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
+        </td>`;
+
+      const makeRow = (sizes, priceLabel) => `<tr>
+        ${checkCell}
+        <td><strong>${esc(p.code)}</strong></td>
+        <td>${esc(p.description)}</td>
+        <td>${esc(p.brand || '–')}</td>
+        <td><span class="text-muted small">${esc(sizes)}</span></td>
+        <td class="text-end">${priceLabel}</td>
+        ${actions}
+      </tr>`;
+
+      // Sin variantes => una sola fila con guiones
+      if (!groups.length) return makeRow('–', '–');
+      // Una fila por precio, con solo las tallas de ese precio
+      return groups.map(g => makeRow(g.sizes.join(', '), fCurrency(g.price))).join('');
+    });
+
     el.innerHTML = `<table class="table table-hover">
       <thead><tr>${_canDelete ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Código</th><th>Descripción</th><th>Marca</th><th>Tallas</th><th class="text-end">Precio Venta</th><th></th></tr></thead>
-      <tbody>
-        ${rows.map(p => {
-          const variants = p.product_variants || [];
-
-          // Agrupar tallas por precio: una fila por cada precio distinto.
-          // Tallas ordenadas según Configuración; los grupos también según ese orden.
-          const byPrice = new Map();
-          variants.forEach(v => {
-            const key = v.sale_price ?? 0;
-            if (!byPrice.has(key)) byPrice.set(key, new Set());
-            byPrice.get(key).add(v.size);
-          });
-          const groups = [...byPrice.entries()]
-            .map(([price, sizeSet]) => ({ price, sizes: sortSizes([...sizeSet]) }))
-            .sort((a, b) => compareSize(a.sizes[0], b.sizes[0]));
-
-          const checkCell = _canDelete ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${p.id}"></td>` : '';
-          const actions = `<td class="td-actions">
-              ${_canEdit ? `<button class="btn btn-xs btn-outline" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
-            </td>`;
-
-          const makeRow = (sizes, priceLabel) => `<tr>
-            ${checkCell}
-            <td><strong>${esc(p.code)}</strong></td>
-            <td>${esc(p.description)}</td>
-            <td>${esc(p.brand || '–')}</td>
-            <td><span class="text-muted small">${esc(sizes)}</span></td>
-            <td class="text-end">${priceLabel}</td>
-            ${actions}
-          </tr>`;
-
-          // Sin variantes => una sola fila con guiones
-          if (!groups.length) return makeRow('–', '–');
-          // Una fila por precio, con solo las tallas de ese precio
-          return groups.map(g => makeRow(g.sizes.join(', '), fCurrency(g.price))).join('');
-        }).join('')}
-      </tbody>
+      <tbody></tbody>
     </table>`;
-    enableTableSort(el.querySelector('table'));
-    enableColumnResize(el.querySelector('table'));
-    if (_canDelete) enableBulkDelete(el.querySelector('table'), document.getElementById('pr-bulk-del'), async ids => {
+    const table = el.querySelector('table');
+    const lazy = lazyRenderRows(table, rowsHTML);
+    enableTableSort(table, { onBeforeSort: lazy.renderAll });
+    enableColumnResize(table);
+    if (_canDelete) enableBulkDelete(table, document.getElementById('pr-bulk-del'), async ids => {
       const { error } = await db.from('products').update({ active: false }).in('id', ids);
       if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
       toast(`${ids.length} producto(s) eliminado(s)`); load();
-    });
+    }, { onBeforeSelectAll: lazy.renderAll });
   }
 
   window._pr = {

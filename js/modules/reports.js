@@ -128,8 +128,8 @@ function renderSeasonReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
     { key: 'season',  header: 'Temporada' },
     { key: 'orders',  header: 'Pedidos' },
     { key: 'qty',     header: 'Unidades' },
-    { key: 'revenue', header: 'Ventas',  format: v => fCurrency(v) },
-    ...(showCost ? [{ key: 'cost', header: 'Costo', format: v => fCurrency(v) }] : [])
+    { key: 'revenue', header: 'Ventas',  format: v => fNum(v) },
+    ...(showCost ? [{ key: 'cost', header: 'Costo', format: v => fNum(v) }] : [])
   ];
   document.getElementById('rpt-s-pdf')?.addEventListener('click', () => exportPDF('Ventas por Temporada', COLS, rows, 'ventas-temporada.pdf'));
   document.getElementById('rpt-s-xls')?.addEventListener('click', () => exportExcel('Temporada', COLS, rows, 'ventas-temporada.xlsx'));
@@ -214,8 +214,8 @@ function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
     { key: 'seller',  header: 'Vendedor' },
     { key: 'orders',  header: 'Pedidos' },
     { key: 'qty',     header: 'Unidades' },
-    { key: 'revenue', header: 'Ventas', format: v => fCurrency(v) },
-    ...(showCost ? [{ key: 'cost', header: 'Costo', format: v => fCurrency(v) }] : []),
+    { key: 'revenue', header: 'Ventas', format: v => fNum(v) },
+    ...(showCost ? [{ key: 'cost', header: 'Costo', format: v => fNum(v) }] : []),
     { key: 'revenue', header: '% Ventas', format: v => (totalRevenue > 0 ? (v / totalRevenue * 100) : 0).toFixed(1) + '%' }
   ];
   document.getElementById('rpt-v-pdf')?.addEventListener('click', () => exportPDF('Ventas por Vendedor', COLS, rows, 'ventas-vendedor.pdf'));

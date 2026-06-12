@@ -1249,6 +1249,15 @@ select.form-control { cursor: pointer; }
   letter-spacing: .3px;
 }
 .detail-value { flex: 1; word-break: break-word; }
+.detail-subtitle {
+  margin: 16px 0 4px;
+  font-size: .82em;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.detail-subtitle i { color: var(--accent); margin-right: 6px; }
 
 /* Filtro multi-selección (popover) */
 .filter-anchor { position: relative; display: inline-flex; }

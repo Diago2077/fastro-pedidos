@@ -9,7 +9,6 @@ let _all = [];
 
 export async function renderProducts(container) {
   const _canCreate = canCreateProducts();
-  const _canEdit   = canEditProducts();
   const _canDelete = canDeleteProducts();
   const _canCost   = canSeeCost();
   const _canXls    = canExportExcel();
@@ -158,7 +157,7 @@ export async function renderProducts(container) {
 
       const checkCell = _canDelete ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${p.id}"></td>` : '';
       const actions = `<td class="td-actions">
-          ${_canEdit ? `<button class="btn btn-xs btn-outline" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
+          <button class="btn btn-xs btn-outline" title="Ver detalle" onclick="window._pr.view('${p.id}')"><i class="fas fa-eye"></i> Ver</button>
         </td>`;
 
       const makeRow = (sizes, priceLabel) => `<tr>
@@ -193,6 +192,16 @@ export async function renderProducts(container) {
   }
 
   window._pr = {
+    async view(id) {
+      // Importante: NO se trae cost_price (el detalle "Ver" oculta el costo).
+      const { data } = await db.from('products')
+        .select('code, description, brand, season, providers(name), product_variants(size, color, sale_price)')
+        .eq('id', id).single();
+      if (!data) { toast('No se pudo cargar el producto', 'error'); return; }
+      data.id = id;
+      openModal('Detalle del Producto', productDetailHTML(data));
+    },
+
     async form(id) {
       // Load providers for dropdown
       const { data: provs } = await db.from('providers').select('id, name').eq('active', true).order('name');
@@ -237,6 +246,46 @@ export async function renderProducts(container) {
 
   document.getElementById('q-prod')?.addEventListener('input', debounce(applyFilters, 250));
   load();
+}
+
+// Detalle "Ver" del producto: muestra toda la info MENOS el costo.
+// El botón Editar queda sujeto al permiso del usuario (igual que en Clientes).
+function productDetailHTML(p) {
+  const variants = p.product_variants || [];
+  const row = (label, val) =>
+    `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${esc(val == null || val === '' ? '–' : String(val))}</span></div>`;
+
+  const colors = [...new Set(variants.map(v => v.color).filter(Boolean))];
+
+  // Tallas agrupadas por precio de venta (sin costo), en el orden configurado.
+  const byPrice = new Map();
+  variants.forEach(v => {
+    const key = v.sale_price ?? 0;
+    if (!byPrice.has(key)) byPrice.set(key, new Set());
+    byPrice.get(key).add(v.size);
+  });
+  const groups = [...byPrice.entries()]
+    .map(([price, sizeSet]) => ({ price, sizes: sortSizes([...sizeSet]) }))
+    .sort((a, b) => compareSize(a.sizes[0], b.sizes[0]));
+
+  const sizesBlock = groups.length
+    ? groups.map(g => `<div class="detail-row"><span class="detail-value">${esc(g.sizes.join(', '))}</span><span class="detail-value text-end">${fCurrency(g.price)}</span></div>`).join('')
+    : `<div class="detail-row"><span class="detail-value text-muted">Sin tallas cargadas</span></div>`;
+
+  return `<div class="client-detail">
+    ${row('Código', p.code)}
+    ${row('Descripción', p.description)}
+    ${row('Marca', p.brand)}
+    ${row('Proveedor', p.providers?.name)}
+    ${row('Temporada', p.season)}
+    ${row('Colores', colors.length ? colors.join(', ') : '')}
+  </div>
+  <div class="detail-subtitle"><i class="fas fa-ruler"></i> Tallas y precio de venta</div>
+  <div class="client-detail">${sizesBlock}</div>
+  <div class="form-footer">
+    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
+    ${canEditProducts() ? `<button type="button" class="btn btn-accent" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i> Editar</button>` : ''}
+  </div>`;
 }
 
 function buildProductFormHTML(p, provs, initSizes, initColors) {

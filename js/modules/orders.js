@@ -762,6 +762,20 @@ async function saveOrder(originalOrder, orderId, onSavedFn) {
     return;
   }
 
+  if (!fd.get('provider_id')) {
+    setLoading(btn, false);
+    toast('Seleccioná un proveedor', 'warning');
+    document.getElementById('order-provider')?.focus();
+    return;
+  }
+
+  if (!_state.items.length) {
+    setLoading(btn, false);
+    toast('Agregá al menos un producto al pedido', 'warning');
+    document.getElementById('prod-search')?.focus();
+    return;
+  }
+
   const payload = {
     client_id:    fd.get('client_id')    || null,
     provider_id:  fd.get('provider_id')  || null,

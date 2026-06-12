@@ -592,10 +592,24 @@ select.form-control { cursor: pointer; }
    y filtros (.card-header) y los títulos de columna (thead) quedan fijos
    arriba mientras se recorren las filas.
    ============================================================ */
+/* Cuando se muestra una lista con tabla, acotamos la cadena de alto a la
+   altura de la pantalla. Todo el layout usa min-height (crecería con el
+   contenido), así que sin esto el scroll se iría a la página entera y los
+   encabezados no quedarían fijos. */
+.app-layout:has(.content-area > .card > .table-responsive) {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;            /* el scroll vive dentro de la tabla */
+}
+.app-layout:has(.content-area > .card > .table-responsive) .main-wrapper {
+  min-height: 0;
+}
 .content-area:has(> .card > .table-responsive) {
+  /* flex:1 (regla base) ya le da el alto del main-wrapper, ahora acotado */
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
 .content-area:has(> .card > .table-responsive) > .card {
   flex: 1;

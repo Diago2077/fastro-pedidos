@@ -2,6 +2,7 @@ import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes } from '../utils/sizes.js';
+import { createMultiFilter } from '../utils/filters.js';
 import { getSession, isAdmin, canExportExcel, canCreateOrders, canEditOrders, canDeleteOrders } from '../auth.js';
 
 // In-memory state for order editing
@@ -35,20 +36,12 @@ export async function renderOrders(container) {
               <i class="fas fa-search"></i>
               <input type="text" id="q-ord" placeholder="Buscar por N° o cliente…" class="form-control">
             </div>
-            <button id="btn-toggle-filters" type="button" class="btn btn-sm btn-outline"><i class="fas fa-filter"></i> Filtro</button>
+            <span class="filter-anchor">
+              <button id="btn-toggle-filters" type="button" class="btn btn-sm btn-outline"><i class="fas fa-filter"></i> Filtro</button>
+              <div id="ord-filters" class="filter-popover hidden"></div>
+            </span>
             ${canDeleteOrders() ? `<button class="btn btn-sm btn-danger" id="ord-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
             ${canCreateOrders() ? `<button class="btn btn-accent" onclick="window._ord.new()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
-          </div>
-          <div id="ord-filters" class="card-actions hidden">
-            <select id="filter-client" class="form-control form-control-sm" style="width:auto"><option value="">Todos los clientes</option></select>
-            ${isAdmin() ? `<select id="filter-seller" class="form-control form-control-sm" style="width:auto"><option value="">Todos los vendedores</option></select>` : ''}
-            <select id="filter-season" class="form-control form-control-sm" style="width:auto"><option value="">Todas las temporadas</option></select>
-            <select id="filter-status" class="form-control form-control-sm" style="width:auto">
-              <option value="">Todos los estados</option>
-              <option value="open">Abiertos</option>
-              <option value="closed">Cerrados</option>
-              <option value="sent">Enviados</option>
-            </select>
           </div>
         </div>
       </div>
@@ -56,6 +49,24 @@ export async function renderOrders(container) {
     </div>`;
 
   let _totByOrder = {};
+
+  // Filtro multi-selección (popover)
+  const _filterDefs = [{ key: 'client', label: 'Cliente' }];
+  if (isAdmin()) _filterDefs.push({ key: 'seller', label: 'Vendedor' });
+  _filterDefs.push({ key: 'season', label: 'Temporada' }, { key: 'status', label: 'Estado' });
+
+  const _filter = createMultiFilter({
+    button: document.getElementById('btn-toggle-filters'),
+    panel:  document.getElementById('ord-filters'),
+    defs:   _filterDefs,
+    onChange: applyFilters
+  });
+  const _getters = {
+    client: o => o.clients?.id || '',
+    seller: o => o.users?.id || '',
+    season: o => o.season || '',
+    status: o => o.status || ''
+  };
 
   async function load() {
     const tbl = document.getElementById('ord-tbl');
@@ -78,7 +89,7 @@ export async function renderOrders(container) {
     applyFilters();
   }
 
-  // Rellena los desplegables de cliente/vendedor/temporada con los valores presentes
+  // Rellena el filtro con los valores presentes (cliente/vendedor/temporada/estado)
   function populateFilters() {
     const clients = new Map(), sellers = new Map(), seasons = new Set();
     _allOrders.forEach(o => {
@@ -86,36 +97,25 @@ export async function renderOrders(container) {
       if (o.users?.id)   sellers.set(o.users.id, o.users.name);
       if (o.season)      seasons.add(o.season);
     });
-    fillSelect('filter-client', [...clients.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])), 'Todos los clientes');
-    fillSelect('filter-seller', [...sellers.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])), 'Todos los vendedores');
-    fillSelect('filter-season', [...seasons].sort().map(s => [s, s]), 'Todas las temporadas');
-  }
-
-  function fillSelect(id, entries, placeholder) {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    const current = sel.value;
-    sel.innerHTML = `<option value="">${placeholder}</option>` +
-      entries.map(([val, label]) => `<option value="${esc(String(val))}">${esc(label)}</option>`).join('');
-    if ([...sel.options].some(o => o.value === current)) sel.value = current;
+    _filter.setOptions('client', [...clients.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])).map(([v, l]) => ({ value: v, label: l })));
+    if (isAdmin()) _filter.setOptions('seller', [...sellers.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])).map(([v, l]) => ({ value: v, label: l })));
+    _filter.setOptions('season', [...seasons].sort().map(s => ({ value: s, label: s })));
+    _filter.setOptions('status', [
+      { value: 'open',   label: 'Abiertos' },
+      { value: 'closed', label: 'Cerrados' },
+      { value: 'sent',   label: 'Enviados' }
+    ]);
+    _filter.render();
   }
 
   function applyFilters() {
-    const q      = normTxt(document.getElementById('q-ord')?.value.trim() || '');
-    const status = document.getElementById('filter-status')?.value || '';
-    const client = document.getElementById('filter-client')?.value || '';
-    const seller = document.getElementById('filter-seller')?.value || '';
-    const season = document.getElementById('filter-season')?.value || '';
+    const q = normTxt(document.getElementById('q-ord')?.value.trim() || '');
 
-    let rows = _allOrders;
-    if (q)      rows = rows.filter(o => normTxt(o.order_number).includes(q) || normTxt(o.clients?.name).includes(q));
-    if (status) rows = rows.filter(o => o.status === status);
-    if (client) rows = rows.filter(o => o.clients?.id === client);
-    if (seller) rows = rows.filter(o => o.users?.id === seller);
-    if (season) rows = rows.filter(o => (o.season || '') === season);
+    let rows = _allOrders.filter(_filter.passes(_getters));
+    if (q) rows = rows.filter(o => normTxt(o.order_number).includes(q) || normTxt(o.clients?.name).includes(q));
 
     // Indicador de filtros activos en el botón
-    const active = [status, client, seller, season].filter(Boolean).length;
+    const active = _filter.activeCount();
     const fbtn = document.getElementById('btn-toggle-filters');
     if (fbtn) {
       fbtn.innerHTML = `<i class="fas fa-filter"></i> Filtro${active ? ` (${active})` : ''}`;
@@ -183,13 +183,7 @@ export async function renderOrders(container) {
     }
   });
 
-  document.getElementById('btn-toggle-filters')?.addEventListener('click', () => {
-    document.getElementById('ord-filters')?.classList.toggle('hidden');
-  });
   document.getElementById('q-ord')?.addEventListener('input', debounce(applyFilters, 250));
-  ['filter-status', 'filter-client', 'filter-seller', 'filter-season'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', applyFilters);
-  });
 
   load();
 }

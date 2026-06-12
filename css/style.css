@@ -1074,6 +1074,74 @@ select.form-control { cursor: pointer; }
   color: var(--text);
 }
 
+/* Filtro multi-selección (popover) */
+.filter-anchor { position: relative; display: inline-flex; }
+.filter-popover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1200;
+  min-width: 240px;
+  max-width: 320px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  padding: 10px;
+}
+.filter-popover.hidden { display: none; }
+.filter-group { margin-bottom: 10px; }
+.filter-group-title {
+  font-size: .72em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.filter-group-count {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+  padding: 0 6px;
+  font-size: .9em;
+  line-height: 1.5;
+}
+.filter-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .9em;
+}
+.filter-option:hover { background: var(--border-light); }
+.filter-option input { accent-color: var(--accent); width: 15px; height: 15px; flex: 0 0 auto; }
+.filter-empty { font-size: .82em; color: var(--text-muted); padding: 4px 6px; }
+.filter-popover-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 4px;
+  text-align: right;
+}
+/* En pantallas chicas, el popover ocupa casi todo el ancho disponible */
+@media (max-width: 540px) {
+  .filter-popover { min-width: 220px; max-width: 86vw; }
+}
+
 /* Configuración: grid de tarjetas */
 .settings-grid {
   display: grid;

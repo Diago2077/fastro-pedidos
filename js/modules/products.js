@@ -2,6 +2,7 @@ import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes, compareSize } from '../utils/sizes.js';
+import { createMultiFilter } from '../utils/filters.js';
 import { canSeeCost, canCreateProducts, canEditProducts, canDeleteProducts, canExportExcel } from '../auth.js';
 
 let _all = [];
@@ -22,17 +23,15 @@ export async function renderProducts(container) {
               <i class="fas fa-search"></i>
               <input type="text" id="q-prod" placeholder="Buscar por código o descripción…" class="form-control">
             </div>
-            <button id="btn-toggle-prod-filters" type="button" class="btn btn-sm btn-outline"><i class="fas fa-filter"></i> Filtro</button>
+            <span class="filter-anchor">
+              <button id="btn-toggle-prod-filters" type="button" class="btn btn-sm btn-outline"><i class="fas fa-filter"></i> Filtro</button>
+              <div id="prod-filters" class="filter-popover hidden"></div>
+            </span>
             ${_canDelete ? `<button class="btn btn-sm btn-danger" id="pr-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
             <button class="btn btn-sm btn-outline" title="Exportar PDF" onclick="window._pr.pdf()"><i class="fas fa-file-pdf"></i></button>
             ${_canXls    ? `<button class="btn btn-sm btn-outline" title="Exportar Excel" onclick="window._pr.xls()"><i class="fas fa-file-excel"></i></button>` : ''}
             ${_canCreate ? `<button class="btn btn-sm btn-outline" onclick="window._pr.importExcel()"><i class="fas fa-file-upload"></i> Importar</button>` : ''}
             ${_canCreate ? `<button class="btn btn-accent" onclick="window._pr.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
-          </div>
-          <div id="prod-filters" class="card-actions hidden">
-            <select id="pf-brand" class="form-control form-control-sm" style="width:auto"><option value="">Todas las marcas</option></select>
-            <select id="pf-provider" class="form-control form-control-sm" style="width:auto"><option value="">Todos los proveedores</option></select>
-            <select id="pf-season" class="form-control form-control-sm" style="width:auto"><option value="">Todas las temporadas</option></select>
           </div>
         </div>
       </div>
@@ -40,6 +39,25 @@ export async function renderProducts(container) {
     </div>`;
 
   const normTxt = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+  let _filtered = [];   // filas que pasan el filtro (para exportar lo visible)
+
+  // Filtro multi-selección (popover)
+  const _filter = createMultiFilter({
+    button: document.getElementById('btn-toggle-prod-filters'),
+    panel:  document.getElementById('prod-filters'),
+    defs: [
+      { key: 'brand',    label: 'Marca' },
+      { key: 'provider', label: 'Proveedor' },
+      { key: 'season',   label: 'Temporada' }
+    ],
+    onChange: applyFilters
+  });
+  const _getters = {
+    brand:    p => p.brand || '',
+    provider: p => p.provider_id || '',
+    season:   p => p.season || ''
+  };
 
   async function load() {
     const tbl = document.getElementById('pr-tbl');
@@ -60,34 +78,21 @@ export async function renderProducts(container) {
       if (p.provider_id && p.providers?.name) provs.set(p.provider_id, p.providers.name);
       if (p.season) seasons.add(p.season);
     });
-    fillSel('pf-brand', [...brands].sort().map(b => [b, b]), 'Todas las marcas');
-    fillSel('pf-provider', [...provs.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])), 'Todos los proveedores');
-    fillSel('pf-season', [...seasons].sort().map(s => [s, s]), 'Todas las temporadas');
-  }
-
-  function fillSel(id, entries, placeholder) {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    const current = sel.value;
-    sel.innerHTML = `<option value="">${placeholder}</option>` +
-      entries.map(([val, label]) => `<option value="${esc(String(val))}">${esc(label)}</option>`).join('');
-    if ([...sel.options].some(o => o.value === current)) sel.value = current;
+    _filter.setOptions('brand',    [...brands].sort().map(b => ({ value: b, label: b })));
+    _filter.setOptions('provider', [...provs.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])).map(([v, l]) => ({ value: v, label: l })));
+    _filter.setOptions('season',   [...seasons].sort().map(s => ({ value: s, label: s })));
+    _filter.render();
   }
 
   function applyFilters() {
-    const q       = normTxt(document.getElementById('q-prod')?.value.trim() || '');
-    const brand   = document.getElementById('pf-brand')?.value || '';
-    const provider= document.getElementById('pf-provider')?.value || '';
-    const season  = document.getElementById('pf-season')?.value || '';
+    const q = normTxt(document.getElementById('q-prod')?.value.trim() || '');
 
-    let rows = _all;
-    if (q)        rows = rows.filter(p => normTxt(p.code).includes(q) || normTxt(p.description).includes(q));
-    if (brand)    rows = rows.filter(p => (p.brand || '') === brand);
-    if (provider) rows = rows.filter(p => p.provider_id === provider);
-    if (season)   rows = rows.filter(p => (p.season || '') === season);
+    let rows = _all.filter(_filter.passes(_getters));
+    if (q) rows = rows.filter(p => normTxt(p.code).includes(q) || normTxt(p.description).includes(q));
+    _filtered = rows;
 
     // Indicador de filtros activos
-    const active = [brand, provider, season].filter(Boolean).length;
+    const active = _filter.activeCount();
     const fbtn = document.getElementById('btn-toggle-prod-filters');
     if (fbtn) {
       fbtn.innerHTML = `<i class="fas fa-filter"></i> Filtro${active ? ` (${active})` : ''}`;
@@ -193,26 +198,20 @@ export async function renderProducts(container) {
         { key: 'code', header: 'Código' }, { key: 'description', header: 'Descripción' },
         { key: 'brand', header: 'Marca' }, { key: 'season', header: 'Temporada' }
       ];
-      exportPDF('Productos', cols, _all, 'productos.pdf');
+      exportPDF('Productos', cols, _filtered, 'productos.pdf');
     },
     xls() {
       const cols = [
         { key: 'code', header: 'Código' }, { key: 'description', header: 'Descripción' },
         { key: 'brand', header: 'Marca' }, { key: 'season', header: 'Temporada' }
       ];
-      exportExcel('Productos', cols, _all, 'productos.xlsx');
+      exportExcel('Productos', cols, _filtered, 'productos.xlsx');
     },
     importExcel() { openImportModal(load); },
     downloadTemplate
   };
 
-  document.getElementById('btn-toggle-prod-filters')?.addEventListener('click', () => {
-    document.getElementById('prod-filters')?.classList.toggle('hidden');
-  });
   document.getElementById('q-prod')?.addEventListener('input', debounce(applyFilters, 250));
-  ['pf-brand', 'pf-provider', 'pf-season'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', applyFilters);
-  });
   load();
 }
 

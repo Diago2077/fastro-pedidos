@@ -1,6 +1,7 @@
 import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
+import { sortSizes, compareSize } from '../utils/sizes.js';
 import { canSeeCost, canCreateProducts, canEditProducts, canDeleteProducts, canExportExcel } from '../auth.js';
 
 let _all = [];
@@ -107,14 +108,17 @@ export async function renderProducts(container) {
         ${rows.map(p => {
           const variants = p.product_variants || [];
 
-          // Agrupar tallas por precio: una fila por cada precio distinto
+          // Agrupar tallas por precio: una fila por cada precio distinto.
+          // Tallas ordenadas según Configuración; los grupos también según ese orden.
           const byPrice = new Map();
           variants.forEach(v => {
             const key = v.sale_price ?? 0;
             if (!byPrice.has(key)) byPrice.set(key, new Set());
             byPrice.get(key).add(v.size);
           });
-          const groups = [...byPrice.entries()].sort((a, b) => a[0] - b[0]);
+          const groups = [...byPrice.entries()]
+            .map(([price, sizeSet]) => ({ price, sizes: sortSizes([...sizeSet]) }))
+            .sort((a, b) => compareSize(a.sizes[0], b.sizes[0]));
 
           const checkCell = _canDelete ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${p.id}"></td>` : '';
           const actions = `<td class="td-actions">
@@ -134,7 +138,7 @@ export async function renderProducts(container) {
           // Sin variantes => una sola fila con guiones
           if (!groups.length) return makeRow('–', '–');
           // Una fila por precio, con solo las tallas de ese precio
-          return groups.map(([price, sizeSet]) => makeRow([...sizeSet].join(', '), fCurrency(price))).join('');
+          return groups.map(g => makeRow(g.sizes.join(', '), fCurrency(g.price))).join('');
         }).join('')}
       </tbody>
     </table>`;
@@ -168,7 +172,9 @@ export async function renderProducts(container) {
         colorsSet.add(v.color);
         if (!sizePriceMap[v.size]) sizePriceMap[v.size] = { sale_price: v.sale_price, cost_price: v.cost_price };
       });
-      const initSizes = Object.entries(sizePriceMap).map(([size, prices]) => ({ size, ...prices }));
+      const initSizes = Object.entries(sizePriceMap)
+        .map(([size, prices]) => ({ size, ...prices }))
+        .sort((a, b) => compareSize(a.size, b.size));
       const initColors = [...colorsSet];
 
       const html = buildProductFormHTML(p, provs || [], initSizes, initColors);

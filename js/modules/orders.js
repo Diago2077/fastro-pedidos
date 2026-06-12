@@ -1,6 +1,7 @@
 import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, fCurrency, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
+import { sortSizes } from '../utils/sizes.js';
 import { getSession, isAdmin, canExportExcel, canCreateOrders, canEditOrders, canDeleteOrders } from '../auth.js';
 
 // In-memory state for order editing
@@ -490,8 +491,8 @@ function showProductGrid(product) {
   // Sort variants by creation order to preserve the order defined when the product was created
   const variants = [...(product.product_variants || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-  // Unique sizes and colors in creation order (no alphabetical sort)
-  const sizes  = [...new Map(variants.map(v => [v.size,  v])).keys()];
+  // Tallas según el orden definido en Configuración; colores en orden de creación
+  const sizes  = sortSizes([...new Map(variants.map(v => [v.size,  v])).keys()]);
   const colors = [...new Map(variants.map(v => [v.color, v])).keys()];
 
   const variantMap = {};

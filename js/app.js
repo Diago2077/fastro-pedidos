@@ -6,6 +6,7 @@ import { initAuth, login, logout, isAdmin,
   canViewDashboard, canViewOrders, canViewClients,
   canViewProducts, canViewProviders, canViewReports } from './auth.js';
 import { avatarInitials, closeModal, toast } from './utils/helpers.js';
+import { loadSizeOrder } from './utils/sizes.js';
 import { renderDashboard }  from './modules/dashboard.js';
 import { renderClients }    from './modules/clients.js';
 import { renderProducts }   from './modules/products.js';
@@ -49,7 +50,10 @@ db.auth.onAuthStateChange((event) => {
 
 document.addEventListener('DOMContentLoaded', async () => {
   const profile = await initAuth();
-  if (profile) showApp(profile); else showLogin();
+  if (profile) {
+    await loadSizeOrder();   // orden de tallas centralizado (Configuración)
+    showApp(profile);
+  } else showLogin();
   _authReady = true;
 });
 

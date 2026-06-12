@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, fNum, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes, compareSize } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -133,7 +133,7 @@ export async function renderProducts(container) {
     { key: 'description', header: 'Descripción' },
     { key: 'brand',       header: 'Marca' },
     { key: 'sizes',       header: 'Tallas' },
-    { key: 'sale_price',  header: 'Precio Venta', format: v => fCurrency(v) }
+    { key: 'sale_price',  header: 'Precio Venta', format: v => fNum(v) }
   ];
 
   function render(rows) {

@@ -19,8 +19,11 @@ export function toast(message, type = 'success', duration = 3500) {
 
 // --- Modal ---
 let _onModalClose = null;
+// Guard opcional: función que devuelve true si se puede cerrar. Si devuelve
+// false (ej. el usuario cancela "salir sin guardar"), el modal no se cierra.
+let _modalGuard = null;
 
-export function openModal(title, bodyHTML, { size = 'md', onClose } = {}) {
+export function openModal(title, bodyHTML, { size = 'md', onClose, guard } = {}) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = bodyHTML;
   const sizes = { sm: '420px', md: '620px', lg: '960px', xl: '1100px' };
@@ -29,9 +32,13 @@ export function openModal(title, bodyHTML, { size = 'md', onClose } = {}) {
   document.getElementById('modal-backdrop').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   _onModalClose = onClose || null;
+  _modalGuard = guard || null;
 }
 
-export function closeModal() {
+// force=true cierra sin consultar el guard (ej. tras guardar correctamente)
+export function closeModal(force = false) {
+  if (!force && _modalGuard && !_modalGuard()) return;
+  _modalGuard = null;
   document.getElementById('modal').classList.add('hidden');
   document.getElementById('modal-backdrop').classList.add('hidden');
   document.body.style.overflow = '';

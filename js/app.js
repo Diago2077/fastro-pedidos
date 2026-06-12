@@ -157,9 +157,9 @@ function showApp(user) {
   // Logout (signOut → onAuthStateChange recarga al login)
   document.getElementById('logout-btn')?.addEventListener('click', () => { logout(); });
 
-  // Modal close
-  document.getElementById('modal-close')?.addEventListener('click', closeModal);
-  document.getElementById('modal-backdrop')?.addEventListener('click', closeModal);
+  // Modal close (envuelto para no pasar el evento como argumento "force")
+  document.getElementById('modal-close')?.addEventListener('click', () => closeModal());
+  document.getElementById('modal-backdrop')?.addEventListener('click', () => closeModal());
 
   // Global closeModal
   window.closeModal = closeModal;

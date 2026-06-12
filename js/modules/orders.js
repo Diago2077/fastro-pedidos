@@ -192,7 +192,7 @@ export async function renderOrders(container) {
 // ORDER MODAL (create / edit)
 // ============================================================
 async function openOrderModal(orderId, onSavedFn) {
-  _state = { items: [], orderId };
+  _state = { items: [], orderId, dirty: false };
 
   // Parallel data fetch
   const [clientsRes, provsRes, cfgRes] = await Promise.all([
@@ -228,7 +228,21 @@ async function openOrderModal(orderId, onSavedFn) {
   }
 
   const html = buildOrderFormHTML(order, clients, providers, orderId);
-  openModal(orderId ? `Pedido ${order.order_number}` : 'Nuevo Pedido', html, { size: 'xl' });
+
+  // Aviso del navegador si se cierra la pestaña / recarga con cambios sin guardar
+  const beforeUnload = (e) => { if (_state.dirty) { e.preventDefault(); e.returnValue = ''; } };
+  window.addEventListener('beforeunload', beforeUnload);
+
+  openModal(orderId ? `Pedido ${order.order_number}` : 'Nuevo Pedido', html, {
+    size: 'xl',
+    // Avisar antes de cerrar (X / Cancelar / fondo) si hay cambios sin guardar
+    guard: () => !_state.dirty || window.confirm('Tenés cambios sin guardar en el pedido. Si salís, se perderán los productos agregados. ¿Salir igual?'),
+    onClose: () => window.removeEventListener('beforeunload', beforeUnload)
+  });
+
+  // Marcar el pedido como "modificado" ante cualquier cambio en el formulario
+  document.getElementById('order-form')?.addEventListener('input',  () => { _state.dirty = true; });
+  document.getElementById('order-form')?.addEventListener('change', () => { _state.dirty = true; });
 
   // Render items table
   renderItemsTable();
@@ -339,6 +353,7 @@ async function openOrderModal(orderId, onSavedFn) {
       const ok = await confirm2('Cambiar de proveedor quitará los productos ya agregados al pedido. ¿Continuar?');
       if (!ok) { providerSelect.value = _prevProvider; return; }
       _state.items = [];
+      _state.dirty = true;
       renderItemsTable();
       updateTotals();
     }
@@ -588,6 +603,7 @@ function showProductGrid(product) {
 
     if (added === 0 && removed === 0) { toast('Ingresa al menos una cantidad', 'warning'); return; }
 
+    _state.dirty = true;
     renderItemsTable();
     updateTotals();
     wrap.innerHTML = '';
@@ -647,9 +663,9 @@ document.addEventListener('input', e => {
 window._ord = window._ord || {};
 Object.assign(window._ord, {
   updateQty(idx, val) {
-    if (_state.items[idx]) { _state.items[idx].qty = Math.max(1, parseInt(val) || 1); renderItemsTable(); updateTotals(); }
+    if (_state.items[idx]) { _state.items[idx].qty = Math.max(1, parseInt(val) || 1); _state.dirty = true; renderItemsTable(); updateTotals(); }
   },
-  removeItem(idx) { _state.items.splice(idx, 1); renderItemsTable(); updateTotals(); }
+  removeItem(idx) { _state.items.splice(idx, 1); _state.dirty = true; renderItemsTable(); updateTotals(); }
 });
 
 // ============================================================
@@ -712,7 +728,8 @@ async function saveOrder(originalOrder, orderId, onSavedFn) {
     }
 
     toast(orderId ? 'Pedido actualizado' : 'Pedido creado');
-    closeModal();
+    _state.dirty = false;
+    closeModal(true);   // forzar: ya se guardó, no preguntar
     if (onSavedFn) onSavedFn();
   } catch (err) {
     toast('Error: ' + err.message, 'error');

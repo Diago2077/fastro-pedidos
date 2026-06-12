@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, fNum, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, fNum, enableTableSort, enableBulkDelete, enableColumnResize, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes, compareSize } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -62,9 +62,9 @@ export async function renderProducts(container) {
   async function load() {
     const tbl = document.getElementById('pr-tbl');
     if (tbl) tbl.innerHTML = loadingHTML();
-    const { data, error } = await db.from('products')
+    const { data, error } = await fetchAllRows(() => db.from('products')
       .select('*, providers(name), product_variants(id, color, size, sale_price, cost_price)')
-      .eq('active', true).order('code');
+      .eq('active', true).order('code'));
     if (error) { if (tbl) tbl.innerHTML = emptyState('Error al cargar productos'); toast('Error al cargar productos', 'error'); return; }
     _all = data || [];
     populateFilters();

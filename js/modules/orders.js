@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -103,17 +103,19 @@ export async function renderOrders(container) {
   async function load() {
     const tbl = document.getElementById('ord-tbl');
     if (tbl) tbl.innerHTML = loadingHTML();
-    let query = db.from('orders')
-      .select('id, order_number, status, season, discount_pct, created_at, shipping_date, clients(id, name), users:profiles(id, name), providers(name)')
-      .order('created_at', { ascending: false });
     // Usuario normal: solo sus propios pedidos (la RLS también lo enforza en la base)
-    if (!isAdmin()) query = query.eq('user_id', getSession()?.id);
-    const { data, error } = await query;
+    const { data, error } = await fetchAllRows(() => {
+      let q = db.from('orders')
+        .select('id, order_number, status, season, discount_pct, created_at, shipping_date, clients(id, name), users:profiles(id, name), providers(name)')
+        .order('created_at', { ascending: false });
+      if (!isAdmin()) q = q.eq('user_id', getSession()?.id);
+      return q;
+    });
     if (error) { if (tbl) tbl.innerHTML = emptyState('Error al cargar pedidos'); toast('Error al cargar pedidos', 'error'); return; }
     _allOrders = data || [];
 
-    // Totales por pedido
-    const { data: items } = await db.from('order_items').select('order_id, quantity, unit_sale_price');
+    // Totales por pedido (order_items también puede superar las 1000 filas)
+    const { data: items } = await fetchAllRows(() => db.from('order_items').select('order_id, quantity, unit_sale_price'));
     _totByOrder = {};
     (items || []).forEach(i => { _totByOrder[i.order_id] = (_totByOrder[i.order_id] || 0) + i.quantity * i.unit_sale_price; });
 

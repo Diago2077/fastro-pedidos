@@ -95,6 +95,23 @@ export function loadingHTML(msg = 'Cargando…') {
 // --- Today YYYY-MM-DD ---
 export function today() { return new Date().toISOString().split('T')[0]; }
 
+// --- Traer TODAS las filas de una consulta (supera el límite de 1000 de Supabase) ---
+// makeQuery() debe devolver una consulta NUEVA en cada llamada (con sus filtros/orden).
+// Pagina de a 1000; si hay menos de 1000, hace una sola request (sin costo extra).
+export async function fetchAllRows(makeQuery, pageSize = 1000) {
+  let out = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await makeQuery().range(from, from + pageSize - 1);
+    if (error) return { data: out, error };
+    if (!data || !data.length) break;
+    out = out.concat(data);
+    if (data.length < pageSize) break;   // última página
+    from += pageSize;
+  }
+  return { data: out, error: null };
+}
+
 // --- Debounce ---
 export function debounce(fn, ms = 300) {
   let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };

@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateClients, canEditClients, canDeleteClients } from '../auth.js';
 
@@ -37,9 +37,11 @@ export async function renderClients(container) {
   async function load(q = '') {
     const tbl = document.getElementById('cl-tbl');
     if (tbl) tbl.innerHTML = loadingHTML();
-    let query = db.from('clients').select('*').eq('active', true).order('code', { ascending: false, nullsFirst: false });
-    if (q) query = query.ilike('name', `%${q}%`);
-    const { data, error } = await query;
+    const { data, error } = await fetchAllRows(() => {
+      let cq = db.from('clients').select('*').eq('active', true).order('code', { ascending: false, nullsFirst: false });
+      if (q) cq = cq.ilike('name', `%${q}%`);
+      return cq;
+    });
     if (error) { if (tbl) tbl.innerHTML = emptyState('Error al cargar clientes'); toast('Error al cargar clientes', 'error'); return; }
     _all = data || [];
     render(_all);

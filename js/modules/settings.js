@@ -5,9 +5,9 @@ import { setSizeOrderCache } from '../utils/sizes.js';
 export async function renderSettings(container) {
   container.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin fa-2x"></i></div>`;
 
-  const [{ data: cfgData, error }, { data: varData }] = await Promise.all([
+  const [{ data: cfgData, error }, allSizes] = await Promise.all([
     db.from('app_config').select('*'),
-    db.from('product_variants').select('size')
+    fetchAllSizes()
   ]);
   if (error) { toast('Error al cargar configuración', 'error'); return; }
 
@@ -15,7 +15,6 @@ export async function renderSettings(container) {
 
   // Orden de tallas: el guardado primero (solo los que aún existen), luego las tallas nuevas
   const savedOrder = parseOrder(cfg.size_order);
-  const allSizes = [...new Set((varData || []).map(v => String(v.size || '').trim()).filter(Boolean))];
   let order = [
     ...savedOrder.filter(s => allSizes.includes(s)),
     ...allSizes.filter(s => !savedOrder.includes(s))
@@ -119,6 +118,23 @@ export async function renderSettings(container) {
   });
 
   renderList();
+}
+
+// Lee TODAS las tallas distintas de product_variants paginando, porque Supabase
+// devuelve como máximo 1000 filas por consulta (si no, faltarían tallas).
+async function fetchAllSizes() {
+  const sizes = new Set();
+  const PAGE = 1000;
+  let from = 0;
+  for (;;) {
+    const { data, error } = await db.from('product_variants')
+      .select('size').range(from, from + PAGE - 1);
+    if (error || !data || !data.length) break;
+    data.forEach(v => { const s = String(v.size || '').trim(); if (s) sizes.add(s); });
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return [...sizes];
 }
 
 function parseOrder(value) {

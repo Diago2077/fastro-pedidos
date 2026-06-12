@@ -103,6 +103,39 @@ export async function renderProducts(container) {
     render(rows);
   }
 
+  // Expande los productos filtrados en filas para exportar: una fila por
+  // cada precio de venta, con sus tallas (mismo agrupamiento que la tabla).
+  function buildExportRows() {
+    const out = [];
+    _filtered.forEach(p => {
+      const variants = p.product_variants || [];
+      const byPrice = new Map();
+      variants.forEach(v => {
+        const key = v.sale_price ?? 0;
+        if (!byPrice.has(key)) byPrice.set(key, new Set());
+        byPrice.get(key).add(v.size);
+      });
+      const groups = [...byPrice.entries()]
+        .map(([price, sizeSet]) => ({ price, sizes: sortSizes([...sizeSet]) }))
+        .sort((a, b) => compareSize(a.sizes[0], b.sizes[0]));
+      const base = { code: p.code, description: p.description, brand: p.brand || '' };
+      if (!groups.length) {
+        out.push({ ...base, sizes: '–', sale_price: 0 });
+      } else {
+        groups.forEach(g => out.push({ ...base, sizes: g.sizes.join(', '), sale_price: g.price }));
+      }
+    });
+    return out;
+  }
+
+  const EXPORT_COLS = [
+    { key: 'code',        header: 'Código' },
+    { key: 'description', header: 'Descripción' },
+    { key: 'brand',       header: 'Marca' },
+    { key: 'sizes',       header: 'Tallas' },
+    { key: 'sale_price',  header: 'Precio Venta', format: v => fCurrency(v) }
+  ];
+
   function render(rows) {
     const el = document.getElementById('pr-tbl');
     if (!el) return;
@@ -193,20 +226,8 @@ export async function renderProducts(container) {
       toast('Producto eliminado'); load();
     },
 
-    pdf() {
-      const cols = [
-        { key: 'code', header: 'Código' }, { key: 'description', header: 'Descripción' },
-        { key: 'brand', header: 'Marca' }, { key: 'season', header: 'Temporada' }
-      ];
-      exportPDF('Productos', cols, _filtered, 'productos.pdf');
-    },
-    xls() {
-      const cols = [
-        { key: 'code', header: 'Código' }, { key: 'description', header: 'Descripción' },
-        { key: 'brand', header: 'Marca' }, { key: 'season', header: 'Temporada' }
-      ];
-      exportExcel('Productos', cols, _filtered, 'productos.xlsx');
-    },
+    pdf() { exportPDF('Productos', EXPORT_COLS, buildExportRows(), 'productos.pdf'); },
+    xls() { exportExcel('Productos', EXPORT_COLS, buildExportRows(), 'productos.xlsx'); },
     importExcel() { openImportModal(load); },
     downloadTemplate
   };

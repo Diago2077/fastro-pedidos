@@ -16,6 +16,38 @@ const STATUS_LABELS = { open: 'Abierto', sent: 'Enviado', closed: 'Cerrado' };
 function nextStatus(s) { return { open: 'closed', closed: 'sent', sent: 'open' }[s] || 'open'; }
 function todayISO() { return new Date().toISOString().split('T')[0]; }
 
+// ---- Borrador automático de pedido NUEVO (localStorage) ----
+// Sobrevive a cierres de pestaña, recargas o caídas para no perder el pedido.
+const DRAFT_KEY = 'fastro_order_draft';
+let _draftActive = false; // true mientras hay un modal de pedido NUEVO abierto
+
+function readOrderDraft() {
+  try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { return null; }
+}
+function clearOrderDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+}
+const persistOrderDraft = debounce(() => {
+  if (!_draftActive) return;
+  const g = id => document.getElementById(id);
+  const draft = {
+    client_id:    g('client-id-val')?.value || '',
+    client_label: g('client-search')?.value || '',
+    provider_id:  g('order-provider')?.value || '',
+    season:       document.querySelector('#order-form [name=season]')?.value || '',
+    discount_pct: g('discount-input')?.value || '0',
+    shipping_date:g('order-shipping-date-val')?.value || '',
+    status:       g('order-status-val')?.value || 'open',
+    observation:  document.querySelector('#order-form [name=observation]')?.value || '',
+    items:        _state.items,
+    savedAt:      Date.now()
+  };
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch (e) {}
+}, 600);
+
+// Marca el pedido como modificado y agenda guardar el borrador
+function orderChanged() { _state.dirty = true; persistOrderDraft(); }
+
 // Etiqueta de cliente: "1024 — Juan Pérez (Tienda Centro)"
 function clientLabel(c) {
   if (!c) return '';
@@ -233,16 +265,46 @@ async function openOrderModal(orderId, onSavedFn) {
   const beforeUnload = (e) => { if (_state.dirty) { e.preventDefault(); e.returnValue = ''; } };
   window.addEventListener('beforeunload', beforeUnload);
 
+  _draftActive = !orderId; // solo se guardan borradores de pedidos NUEVOS
+
   openModal(orderId ? `Pedido ${order.order_number}` : 'Nuevo Pedido', html, {
     size: 'xl',
     // Avisar antes de cerrar (X / Cancelar / fondo) si hay cambios sin guardar
     guard: () => !_state.dirty || window.confirm('Tenés cambios sin guardar en el pedido. Si salís, se perderán los productos agregados. ¿Salir igual?'),
-    onClose: () => window.removeEventListener('beforeunload', beforeUnload)
+    onClose: () => {
+      window.removeEventListener('beforeunload', beforeUnload);
+      // Cierre deliberado de un pedido NUEVO (guardar o confirmar salida): el
+      // borrador ya no aplica. Si la app se cae sin pasar por acá, queda para recuperar.
+      // En pedidos existentes NO se toca el borrador (puede haber uno nuevo pendiente).
+      if (!orderId) { _draftActive = false; clearOrderDraft(); }
+    }
   });
 
-  // Marcar el pedido como "modificado" ante cualquier cambio en el formulario
-  document.getElementById('order-form')?.addEventListener('input',  () => { _state.dirty = true; });
-  document.getElementById('order-form')?.addEventListener('change', () => { _state.dirty = true; });
+  // Marcar el pedido como "modificado" y guardar borrador ante cualquier cambio
+  document.getElementById('order-form')?.addEventListener('input',  orderChanged);
+  document.getElementById('order-form')?.addEventListener('change', orderChanged);
+
+  // Restaurar valores del borrador al formulario ya montado
+  function restoreDraft(d) {
+    const g = id => document.getElementById(id);
+    if (g('client-id-val'))  g('client-id-val').value  = d.client_id || '';
+    if (g('client-search'))  g('client-search').value  = d.client_label || '';
+    if (g('order-provider')) g('order-provider').value = d.provider_id || '';
+    const seasonEl = document.querySelector('#order-form [name=season]'); if (seasonEl) seasonEl.value = d.season || '';
+    if (g('discount-input'))          g('discount-input').value          = d.discount_pct ?? 0;
+    if (g('order-shipping-date-val')) g('order-shipping-date-val').value = d.shipping_date || '';
+    if (g('order-status-val'))        g('order-status-val').value        = d.status || 'open';
+    const obsEl = document.querySelector('#order-form [name=observation]'); if (obsEl) obsEl.value = d.observation || '';
+    const sbtn = g('order-status-btn');
+    if (sbtn) { const s = d.status || 'open'; sbtn.className = `status-btn status-${s}`; sbtn.innerHTML = `${STATUS_LABELS[s]} <i class="fas fa-sync-alt fa-xs" style="margin-left:5px;opacity:.5"></i>`; }
+    _state.items = Array.isArray(d.items) ? d.items : [];
+    _state.dirty = true;
+    _prevProvider = d.provider_id || '';
+    renderItemsTable();
+    updateTotals();
+    syncProductSearchState();
+    toast('Pedido sin terminar recuperado', 'info');
+  }
 
   // Render items table
   renderItemsTable();
@@ -353,7 +415,7 @@ async function openOrderModal(orderId, onSavedFn) {
       const ok = await confirm2('Cambiar de proveedor quitará los productos ya agregados al pedido. ¿Continuar?');
       if (!ok) { providerSelect.value = _prevProvider; return; }
       _state.items = [];
-      _state.dirty = true;
+      orderChanged();
       renderItemsTable();
       updateTotals();
     }
@@ -402,6 +464,20 @@ async function openOrderModal(orderId, onSavedFn) {
     catch (e) { toast('Error al exportar: ' + e.message, 'error'); }
     finally { setLoading(btn, false); }
   });
+
+  // ¿Hay un borrador de un pedido nuevo sin terminar? Ofrecer recuperarlo.
+  // (al final, cuando ya está todo el formulario cableado)
+  if (_draftActive) {
+    const draft = readOrderDraft();
+    if (draft && Array.isArray(draft.items) && draft.items.length) {
+      const when = draft.savedAt ? new Date(draft.savedAt).toLocaleString('es-PY') : '';
+      if (await confirm2(`Encontramos un pedido sin terminar (${draft.items.length} producto/s${when ? ` · ${when}` : ''}). ¿Recuperarlo?`)) {
+        restoreDraft(draft);
+      } else {
+        clearOrderDraft();
+      }
+    }
+  }
 }
 
 function buildOrderFormHTML(order, clients, providers, orderId) {
@@ -603,7 +679,7 @@ function showProductGrid(product) {
 
     if (added === 0 && removed === 0) { toast('Ingresa al menos una cantidad', 'warning'); return; }
 
-    _state.dirty = true;
+    orderChanged();
     renderItemsTable();
     updateTotals();
     wrap.innerHTML = '';
@@ -663,9 +739,9 @@ document.addEventListener('input', e => {
 window._ord = window._ord || {};
 Object.assign(window._ord, {
   updateQty(idx, val) {
-    if (_state.items[idx]) { _state.items[idx].qty = Math.max(1, parseInt(val) || 1); _state.dirty = true; renderItemsTable(); updateTotals(); }
+    if (_state.items[idx]) { _state.items[idx].qty = Math.max(1, parseInt(val) || 1); orderChanged(); renderItemsTable(); updateTotals(); }
   },
-  removeItem(idx) { _state.items.splice(idx, 1); _state.dirty = true; renderItemsTable(); updateTotals(); }
+  removeItem(idx) { _state.items.splice(idx, 1); orderChanged(); renderItemsTable(); updateTotals(); }
 });
 
 // ============================================================

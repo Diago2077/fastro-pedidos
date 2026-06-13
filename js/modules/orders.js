@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, confirmDialog, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, confirmDialog, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableColumnResize, lazyRenderRows, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -70,7 +70,6 @@ export async function renderOrders(container) {
             </div>
             ${canCreateOrders() ? `<button class="btn btn-accent" onclick="window._ord.new()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
           </div>
-          ${canDeleteOrders() ? `<button class="btn btn-sm btn-danger bulk-action" id="ord-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="ord-tbl"></div>
@@ -162,12 +161,13 @@ export async function renderOrders(container) {
     const el = document.getElementById('ord-tbl');
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay pedidos'); return; }
-    const canDel = canDeleteOrders();
     const rowsHTML = rows.map(o => {
       const sub = totByOrder[o.id] || 0;
       const tot = sub * (1 - (o.discount_pct || 0) / 100);
       return `<tr>
-        ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${o.id}"></td>` : ''}
+        <td class="td-actions col-ver">
+          <button class="btn btn-xs btn-outline" title="Ver / Editar" onclick="window._ord.open('${o.id}')"><i class="fas fa-eye"></i></button>
+        </td>
         <td><strong>${esc(o.order_number)}</strong></td>
         <td>${esc(o.clients?.name || '–')}</td>
         <td>${esc(o.users?.name || '–')}</td>
@@ -176,25 +176,17 @@ export async function renderOrders(container) {
         <td>${fCurrency(tot)}</td>
         <td><button class="status-btn status-${o.status}" onclick="window._ord.changeStatus('${o.id}','${o.status}')">${STATUS_LABELS[o.status] || o.status}</button></td>
         <td>${fDate(o.created_at)}</td>
-        <td class="td-actions">
-          <button class="btn btn-xs btn-outline" title="Ver / Editar" onclick="window._ord.open('${o.id}')"><i class="fas fa-eye"></i></button>
-        </td>
       </tr>`;
     });
 
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr>${canDel ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>N° Pedido</th><th>Cliente</th><th>Vendedor</th><th>Proveedor</th><th>Temporada</th><th>Total</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+      <thead><tr><th class="col-ver no-sort"></th><th>N° Pedido</th><th>Cliente</th><th>Vendedor</th><th>Proveedor</th><th>Temporada</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead>
       <tbody></tbody>
     </table>`;
     const table = el.querySelector('table');
     const lazy = lazyRenderRows(table, rowsHTML);
     enableTableSort(table, { onBeforeSort: lazy.renderAll });
     enableColumnResize(table);
-    if (canDel) enableBulkDelete(table, document.getElementById('ord-bulk-del'), async ids => {
-      const { error } = await db.from('orders').delete().in('id', ids);
-      if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
-      toast(`${ids.length} pedido(s) eliminado(s)`); load();
-    }, { onBeforeSelectAll: lazy.renderAll });
   }
 
   // Use Object.assign so updateQty / removeItem defined at module level are not overwritten
@@ -203,8 +195,9 @@ export async function renderOrders(container) {
     open(id) { openOrderModal(id, () => load()); },
     async del(id) {
       if (!await confirm2('¿Eliminar este pedido definitivamente?')) return;
-      await db.from('orders').delete().eq('id', id);
-      toast('Pedido eliminado'); load();
+      const { error } = await db.from('orders').delete().eq('id', id);
+      if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
+      toast('Pedido eliminado'); closeModal(true); load();
     },
     async changeStatus(id, current) {
       const next = nextStatus(current);
@@ -566,6 +559,7 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
 
     <!-- FOOTER -->
     <div class="form-footer">
+      ${(orderId && canDeleteOrders()) ? `<button type="button" class="btn btn-danger-outline" onclick="window._ord.del('${orderId}')"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
       <button type="button" class="btn btn-outline" id="btn-print-order" title="Imprimir / PDF"><i class="fas fa-file-pdf"></i></button>
       ${canExportExcel() ? `<button type="button" class="btn btn-outline" id="btn-excel-order" title="Exportar Excel"><i class="fas fa-file-excel"></i></button>` : ''}
       <button type="button" class="btn btn-secondary" style="margin-left:auto" onclick="closeModal()">Cancelar</button>

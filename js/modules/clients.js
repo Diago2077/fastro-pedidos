@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableColumnResize, lazyRenderRows, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateClients, canEditClients, canDeleteClients } from '../auth.js';
 
@@ -27,7 +27,6 @@ export async function renderClients(container) {
             </div>
             ${canCreateClients() ? `<button class="btn btn-accent" onclick="window._cl.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
           </div>
-          ${canDeleteClients() ? `<button class="btn btn-sm btn-danger bulk-action" id="cl-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="cl-tbl"></div>
@@ -60,31 +59,24 @@ export async function renderClients(container) {
     const el = document.getElementById('cl-tbl');
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay clientes registrados'); return; }
-    const canDel = canDeleteClients();
     const rowsHTML = rows.map(c => `<tr>
-      ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${c.id}"></td>` : ''}
+      <td class="td-actions col-ver">
+        <button class="btn btn-xs btn-outline" title="Ver detalle" onclick="window._cl.view('${c.id}')"><i class="fas fa-eye"></i></button>
+      </td>
       <td><strong>${c.code ?? '–'}</strong></td>
       <td>${esc(c.name)}</td>
       <td>${esc(c.store_name || '–')}</td>
       <td>${esc(c.city || '–')}</td>
-      <td class="td-actions">
-        <button class="btn btn-xs btn-outline" title="Ver detalle" onclick="window._cl.view('${c.id}')"><i class="fas fa-eye"></i> Ver</button>
-      </td>
     </tr>`);
 
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr>${canDel ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Código</th><th>Nombre</th><th>Tienda</th><th>Ciudad</th><th></th></tr></thead>
+      <thead><tr><th class="col-ver no-sort"></th><th>Código</th><th>Nombre</th><th>Tienda</th><th>Ciudad</th></tr></thead>
       <tbody></tbody>
     </table>`;
     const table = el.querySelector('table');
     const lazy = lazyRenderRows(table, rowsHTML);
     enableTableSort(table, { onBeforeSort: lazy.renderAll });
     enableColumnResize(table);
-    if (canDel) enableBulkDelete(table, document.getElementById('cl-bulk-del'), async ids => {
-      const { error } = await db.from('clients').update({ active: false }).in('id', ids);
-      if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
-      toast(`${ids.length} cliente(s) eliminado(s)`); load();
-    }, { onBeforeSelectAll: lazy.renderAll });
   }
 
   function formHTML(c = {}) {
@@ -137,6 +129,7 @@ export async function renderClients(container) {
       ${row('Correo', c.email)}
     </div>
     <div class="form-footer">
+      ${canDeleteClients() ? `<button type="button" class="btn btn-danger-outline" style="margin-right:auto" onclick="window._cl.del('${c.id}')"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
       ${canEditClients() ? `<button type="button" class="btn btn-accent" onclick="window._cl.form('${c.id}')"><i class="fas fa-edit"></i> Editar</button>` : ''}
     </div>`;
@@ -171,8 +164,9 @@ export async function renderClients(container) {
     },
     async del(id) {
       if (!await confirm2('¿Eliminar este cliente?')) return;
-      await db.from('clients').update({ active: false }).eq('id', id);
-      toast('Cliente eliminado'); load();
+      const { error } = await db.from('clients').update({ active: false }).eq('id', id);
+      if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
+      toast('Cliente eliminado'); closeModal(true); load();
     },
     pdf() { exportPDF('Clientes', COLS, _all, 'clientes.pdf'); },
     xls() { exportExcel('Clientes', COLS, _all, 'clientes.xlsx'); },

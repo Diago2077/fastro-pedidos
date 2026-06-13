@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, mountActionsMenu } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableColumnResize, lazyRenderRows, mountActionsMenu } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateProviders, canEditProviders, canDeleteProviders } from '../auth.js';
 
@@ -17,7 +17,6 @@ export async function renderProviders(container) {
             </div>
             ${canCreateProviders() ? `<button class="btn btn-accent" onclick="window._pv.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
           </div>
-          ${canDeleteProviders() ? `<button class="btn btn-sm btn-danger bulk-action" id="pv-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="pv-tbl"></div>
@@ -47,29 +46,22 @@ export async function renderProviders(container) {
     const el = document.getElementById('pv-tbl');
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay proveedores registrados'); return; }
-    const canDel = canDeleteProviders();
     const rowsHTML = rows.map(p => `<tr>
-      ${canDel ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${p.id}"></td>` : ''}
+      <td class="td-actions col-ver">
+        ${canEditProviders() ? `<button class="btn btn-xs btn-outline" title="Editar" onclick="window._pv.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
+      </td>
       <td><strong>${esc(p.name)}</strong></td>
       <td>${new Date(p.created_at).toLocaleDateString('es-PY')}</td>
-      <td class="td-actions">
-        ${canEditProviders() ? `<button class="btn btn-xs btn-outline" onclick="window._pv.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
-      </td>
     </tr>`);
 
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr>${canDel ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Nombre</th><th>Fecha de registro</th><th></th></tr></thead>
+      <thead><tr><th class="col-ver no-sort"></th><th>Nombre</th><th>Fecha de registro</th></tr></thead>
       <tbody></tbody>
     </table>`;
     const table = el.querySelector('table');
     const lazy = lazyRenderRows(table, rowsHTML);
     enableTableSort(table, { onBeforeSort: lazy.renderAll });
     enableColumnResize(table);
-    if (canDel) enableBulkDelete(table, document.getElementById('pv-bulk-del'), async ids => {
-      const { error } = await db.from('providers').update({ active: false }).in('id', ids);
-      if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
-      toast(`${ids.length} proveedor(es) eliminado(s)`); load();
-    }, { onBeforeSelectAll: lazy.renderAll });
   }
 
   function formHTML(p = {}) {
@@ -79,6 +71,7 @@ export async function renderProviders(container) {
         <input type="text" name="name" class="form-control" value="${esc(p.name || '')}" required autofocus>
       </div>
       <div class="form-footer">
+        ${(p.id && canDeleteProviders()) ? `<button type="button" class="btn btn-danger-outline" style="margin-right:auto" onclick="window._pv.del('${p.id}')"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
         <button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar</button>
       </div>
@@ -106,8 +99,9 @@ export async function renderProviders(container) {
     },
     async del(id) {
       if (!await confirm2('¿Eliminar este proveedor?')) return;
-      await db.from('providers').update({ active: false }).eq('id', id);
-      toast('Proveedor eliminado'); load();
+      const { error } = await db.from('providers').update({ active: false }).eq('id', id);
+      if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
+      toast('Proveedor eliminado'); closeModal(true); load();
     },
     pdf() { exportPDF('Proveedores', [{ key: 'name', header: 'Nombre' }], _all, 'proveedores.pdf'); },
     xls() { exportExcel('Proveedores', [{ key: 'name', header: 'Nombre' }], _all, 'proveedores.xlsx'); }

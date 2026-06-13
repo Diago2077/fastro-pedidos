@@ -715,6 +715,10 @@ select.form-control { cursor: pointer; }
 .td-actions .btn { vertical-align: middle; }
 .td-actions .btn + .btn { margin-left: 4px; }
 
+/* Columna de acción (Ver / Editar) al inicio de la fila: angosta, ícono centrado */
+.col-ver { width: 1%; white-space: nowrap; }
+th.col-ver, .td-actions.col-ver { text-align: center; }
+
 /* Encabezados ordenables */
 .sortable-th { cursor: pointer; user-select: none; }
 .sortable-th:hover { color: var(--text); }

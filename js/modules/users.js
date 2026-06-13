@@ -28,20 +28,20 @@ export async function renderUsers(container) {
     if (!rows.length) { el.innerHTML = emptyState('No hay usuarios'); return; }
     const currentId = getSession()?.id;
     const rowsHTML = rows.map(u => `<tr>
+      <td class="td-actions col-ver">
+        <button class="btn btn-xs btn-outline" title="Editar" onclick="window._usr.form('${u.id}')"><i class="fas fa-edit"></i></button>
+        ${u.id !== currentId ? `<button class="btn btn-xs btn-danger-outline" title="${u.active ? 'Desactivar' : 'Activar'}" onclick="window._usr.toggle('${u.id}', ${u.active})">
+          <i class="fas fa-${u.active ? 'ban' : 'check'}"></i></button>` : ''}
+      </td>
       <td><strong>${esc(u.name || '—')}</strong>${u.id === currentId ? ' <span class="badge badge-info">Yo</span>' : ''}</td>
       <td>${esc(u.email)}</td>
       <td><span class="badge ${u.role === 'admin' ? 'badge-danger' : 'badge-secondary'}">${u.role === 'admin' ? 'Admin' : 'Usuario'}</span></td>
       <td><span class="badge ${u.active ? 'badge-success' : 'badge-secondary'}">${u.active ? 'Activo' : 'Inactivo'}</span></td>
       <td>${new Date(u.created_at).toLocaleDateString('es-PY')}</td>
-      <td class="td-actions">
-        <button class="btn btn-xs btn-outline" onclick="window._usr.form('${u.id}')"><i class="fas fa-edit"></i></button>
-        ${u.id !== currentId ? `<button class="btn btn-xs btn-danger-outline" onclick="window._usr.toggle('${u.id}', ${u.active})">
-          <i class="fas fa-${u.active ? 'ban' : 'check'}"></i></button>` : ''}
-      </td>
     </tr>`);
 
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Creado</th><th></th></tr></thead>
+      <thead><tr><th class="col-ver no-sort"></th><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Creado</th></tr></thead>
       <tbody></tbody>
     </table>`;
     const table = el.querySelector('table');

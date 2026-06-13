@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, fNum, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, fNum, enableTableSort, enableColumnResize, lazyRenderRows, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes, compareSize } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -9,7 +9,6 @@ let _all = [];
 
 export async function renderProducts(container) {
   const _canCreate = canCreateProducts();
-  const _canDelete = canDeleteProducts();
   const _canCost   = canSeeCost();
   const _canXls    = canExportExcel();
 
@@ -24,7 +23,6 @@ export async function renderProducts(container) {
             </div>
             ${_canCreate ? `<button class="btn btn-accent" onclick="window._pr.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
           </div>
-          ${_canDelete ? `<button class="btn btn-sm btn-danger bulk-action" id="pr-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="pr-tbl"></div>
@@ -154,19 +152,17 @@ export async function renderProducts(container) {
         .map(([price, sizeSet]) => ({ price, sizes: sortSizes([...sizeSet]) }))
         .sort((a, b) => compareSize(a.sizes[0], b.sizes[0]));
 
-      const checkCell = _canDelete ? `<td class="chk-col"><input type="checkbox" class="row-chk" value="${p.id}"></td>` : '';
-      const actions = `<td class="td-actions">
-          <button class="btn btn-xs btn-outline" title="Ver detalle" onclick="window._pr.view('${p.id}')"><i class="fas fa-eye"></i> Ver</button>
+      const actionCell = `<td class="td-actions col-ver">
+          <button class="btn btn-xs btn-outline" title="Ver detalle" onclick="window._pr.view('${p.id}')"><i class="fas fa-eye"></i></button>
         </td>`;
 
       const makeRow = (sizes, priceLabel) => `<tr>
-        ${checkCell}
+        ${actionCell}
         <td><strong>${esc(p.code)}</strong></td>
         <td>${esc(p.description)}</td>
         <td>${esc(p.brand || '–')}</td>
         <td><span class="text-muted small">${esc(sizes)}</span></td>
         <td class="text-end">${priceLabel}</td>
-        ${actions}
       </tr>`;
 
       // Sin variantes => una sola fila con guiones
@@ -176,18 +172,13 @@ export async function renderProducts(container) {
     });
 
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr>${_canDelete ? '<th class="chk-col no-sort"><input type="checkbox" class="chk-all"></th>' : ''}<th>Código</th><th>Descripción</th><th>Marca</th><th>Tallas</th><th class="text-end">Precio Venta</th><th></th></tr></thead>
+      <thead><tr><th class="col-ver no-sort"></th><th>Código</th><th>Descripción</th><th>Marca</th><th>Tallas</th><th class="text-end">Precio Venta</th></tr></thead>
       <tbody></tbody>
     </table>`;
     const table = el.querySelector('table');
     const lazy = lazyRenderRows(table, rowsHTML);
     enableTableSort(table, { onBeforeSort: lazy.renderAll });
     enableColumnResize(table);
-    if (_canDelete) enableBulkDelete(table, document.getElementById('pr-bulk-del'), async ids => {
-      const { error } = await db.from('products').update({ active: false }).in('id', ids);
-      if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
-      toast(`${ids.length} producto(s) eliminado(s)`); load();
-    }, { onBeforeSelectAll: lazy.renderAll });
   }
 
   window._pr = {
@@ -233,8 +224,9 @@ export async function renderProducts(container) {
 
     async del(id) {
       if (!await confirm2('¿Eliminar este producto y todas sus variantes?')) return;
-      await db.from('products').update({ active: false }).eq('id', id);
-      toast('Producto eliminado'); load();
+      const { error } = await db.from('products').update({ active: false }).eq('id', id);
+      if (error) { toast('Error al eliminar: ' + error.message, 'error'); return; }
+      toast('Producto eliminado'); closeModal(true); load();
     },
 
     pdf() { exportPDF('Productos', EXPORT_COLS, buildExportRows(), 'productos.pdf'); },
@@ -282,6 +274,7 @@ function productDetailHTML(p) {
   <div class="detail-subtitle"><i class="fas fa-ruler"></i> Tallas y precio de venta</div>
   <div class="client-detail">${sizesBlock}</div>
   <div class="form-footer">
+    ${canDeleteProducts() ? `<button type="button" class="btn btn-danger-outline" style="margin-right:auto" onclick="window._pr.del('${p.id}')"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
     <button type="button" class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
     ${canEditProducts() ? `<button type="button" class="btn btn-accent" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i> Editar</button>` : ''}
   </div>`;

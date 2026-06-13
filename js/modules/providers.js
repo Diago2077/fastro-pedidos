@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, mountActionsMenu } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateProviders, canEditProviders, canDeleteProviders } from '../auth.js';
 
@@ -9,19 +9,28 @@ export async function renderProviders(container) {
   container.innerHTML = `
     <div class="card">
       <div class="card-header">
-        <div class="card-actions">
-          <div class="search-box">
-            <i class="fas fa-search"></i>
-            <input type="text" id="q-prov" placeholder="Buscar proveedor…" class="form-control">
+        <div class="list-header">
+          <div class="list-toolbar">
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" id="q-prov" placeholder="Buscar proveedor…" class="form-control">
+            </div>
+            ${canCreateProviders() ? `<button class="btn btn-accent" onclick="window._pv.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
           </div>
-          ${canDeleteProviders() ? `<button class="btn btn-sm btn-danger" id="pv-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
-          <button class="btn btn-sm btn-outline" title="Exportar PDF" onclick="window._pv.pdf()"><i class="fas fa-file-pdf"></i></button>
-          ${canExportExcel() ? `<button class="btn btn-sm btn-outline" title="Exportar Excel" onclick="window._pv.xls()"><i class="fas fa-file-excel"></i></button>` : ''}
-          ${canCreateProviders() ? `<button class="btn btn-accent" onclick="window._pv.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
+          ${canDeleteProviders() ? `<button class="btn btn-sm btn-danger bulk-action" id="pv-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="pv-tbl"></div>
     </div>`;
+
+  // Menú de acciones (drawer derecho): exportar
+  mountActionsMenu({
+    title: 'Acciones · Proveedores',
+    bodyHTML: `
+      <div class="menu-group-title">Exportar</div>
+      <button class="btn btn-outline menu-action" data-close-menu onclick="window._pv.pdf()"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
+      ${canExportExcel() ? `<button class="btn btn-outline menu-action" data-close-menu onclick="window._pv.xls()"><i class="fas fa-file-excel"></i> Exportar Excel</button>` : ''}`
+  });
 
   async function load(q = '') {
     const tbl = document.getElementById('pv-tbl');

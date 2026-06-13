@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, confirmDialog, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, confirmDialog, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -62,23 +62,27 @@ export async function renderOrders(container) {
   container.innerHTML = `
     <div class="card">
       <div class="card-header">
-        <div style="width:100%;display:flex;flex-direction:column;gap:10px">
-          <div class="card-actions">
+        <div class="list-header">
+          <div class="list-toolbar">
             <div class="search-box">
               <i class="fas fa-search"></i>
               <input type="text" id="q-ord" placeholder="Buscar por N° o cliente…" class="form-control">
             </div>
-            <span class="filter-anchor">
-              <button id="btn-toggle-filters" type="button" class="btn btn-sm btn-outline"><i class="fas fa-filter"></i> Filtro</button>
-              <div id="ord-filters" class="filter-popover hidden"></div>
-            </span>
-            ${canDeleteOrders() ? `<button class="btn btn-sm btn-danger" id="ord-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
             ${canCreateOrders() ? `<button class="btn btn-accent" onclick="window._ord.new()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
           </div>
+          ${canDeleteOrders() ? `<button class="btn btn-sm btn-danger bulk-action" id="ord-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="ord-tbl"></div>
     </div>`;
+
+  // Menú de acciones (drawer derecho): filtros
+  const _menu = mountActionsMenu({
+    title: 'Acciones · Pedidos',
+    bodyHTML: `
+      <div class="menu-group-title"><i class="fas fa-filter"></i> Filtros</div>
+      <div id="ord-filters"></div>`
+  });
 
   let _totByOrder = {};
 
@@ -88,8 +92,8 @@ export async function renderOrders(container) {
   _filterDefs.push({ key: 'season', label: 'Temporada' }, { key: 'status', label: 'Estado' });
 
   const _filter = createMultiFilter({
-    button: document.getElementById('btn-toggle-filters'),
     panel:  document.getElementById('ord-filters'),
+    inline: true,
     defs:   _filterDefs,
     onChange: applyFilters
   });
@@ -148,14 +152,8 @@ export async function renderOrders(container) {
     let rows = _allOrders.filter(_filter.passes(_getters));
     if (q) rows = rows.filter(o => normTxt(o.order_number).includes(q) || normTxt(o.clients?.name).includes(q));
 
-    // Indicador de filtros activos en el botón
-    const active = _filter.activeCount();
-    const fbtn = document.getElementById('btn-toggle-filters');
-    if (fbtn) {
-      fbtn.innerHTML = `<i class="fas fa-filter"></i> Filtro${active ? ` (${active})` : ''}`;
-      fbtn.classList.toggle('btn-accent', active > 0);
-      fbtn.classList.toggle('btn-outline', active === 0);
-    }
+    // Indicador de filtros activos sobre el botón del menú
+    _menu.setBadge(_filter.activeCount());
 
     render(rows, _totByOrder);
   }

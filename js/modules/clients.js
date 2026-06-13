@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateClients, canEditClients, canDeleteClients } from '../auth.js';
 
@@ -19,20 +19,29 @@ export async function renderClients(container) {
   container.innerHTML = `
     <div class="card">
       <div class="card-header">
-        <div class="card-actions">
-          <div class="search-box">
-            <i class="fas fa-search"></i>
-            <input type="text" id="q-clients" placeholder="Buscar cliente…" class="form-control">
+        <div class="list-header">
+          <div class="list-toolbar">
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" id="q-clients" placeholder="Buscar cliente…" class="form-control">
+            </div>
+            ${canCreateClients() ? `<button class="btn btn-accent" onclick="window._cl.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
           </div>
-          ${canDeleteClients() ? `<button class="btn btn-sm btn-danger" id="cl-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
-          <button class="btn btn-sm btn-outline" title="Exportar PDF" onclick="window._cl.pdf()"><i class="fas fa-file-pdf"></i></button>
-          ${canExportExcel() ? `<button class="btn btn-sm btn-outline" title="Exportar Excel" onclick="window._cl.xls()"><i class="fas fa-file-excel"></i></button>` : ''}
-          ${canCreateClients() ? `<button class="btn btn-sm btn-outline" onclick="window._cl.importExcel()"><i class="fas fa-file-upload"></i> Importar</button>` : ''}
-          ${canCreateClients() ? `<button class="btn btn-accent" onclick="window._cl.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
+          ${canDeleteClients() ? `<button class="btn btn-sm btn-danger bulk-action" id="cl-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="cl-tbl"></div>
     </div>`;
+
+  // Menú de acciones (drawer derecho): importar / exportar
+  mountActionsMenu({
+    title: 'Acciones · Clientes',
+    bodyHTML: `
+      <div class="menu-group-title">Importar / Exportar</div>
+      ${canCreateClients() ? `<button class="btn btn-outline menu-action" data-close-menu onclick="window._cl.importExcel()"><i class="fas fa-file-upload"></i> Importar Excel</button>` : ''}
+      <button class="btn btn-outline menu-action" data-close-menu onclick="window._cl.pdf()"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
+      ${canExportExcel() ? `<button class="btn btn-outline menu-action" data-close-menu onclick="window._cl.xls()"><i class="fas fa-file-excel"></i> Exportar Excel</button>` : ''}`
+  });
 
   async function load(q = '') {
     const tbl = document.getElementById('cl-tbl');

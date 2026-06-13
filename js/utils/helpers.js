@@ -50,6 +50,55 @@ export async function closeModal(force = false) {
   if (_onModalClose) { _onModalClose(); _onModalClose = null; }
 }
 
+// --- Menú de acciones de la sección (drawer derecho del topbar) ---
+// Cada módulo arma el contenido (HTML) y lo monta acá; aparece un botón en el
+// topbar que abre el drawer (como el menú lateral, pero desde la derecha).
+// Devuelve { close, setBadge } ; los botones del drawer mantienen sus onclick.
+export function mountActionsMenu({ title = 'Acciones', bodyHTML = '' } = {}) {
+  const wrap    = document.getElementById('topbar-actions');
+  const drawer  = document.getElementById('actions-drawer');
+  const overlay = document.getElementById('actions-drawer-overlay');
+  const body    = document.getElementById('actions-drawer-body');
+  const titleEl = document.getElementById('actions-drawer-title');
+  if (!wrap || !drawer || !overlay || !body) return { close() {}, setBadge() {}, body: null };
+
+  if (titleEl) titleEl.textContent = title;
+  body.innerHTML = bodyHTML;
+  wrap.innerHTML = `<span class="topbar-menu-wrap">
+    <button class="icon-btn" id="topbar-menu-btn" title="Acciones" aria-label="Acciones"><i class="fas fa-ellipsis-vertical"></i></button>
+    <span class="topbar-menu-badge hidden" id="topbar-menu-badge"></span>
+  </span>`;
+
+  const open  = () => { drawer.classList.add('open'); overlay.classList.remove('hidden'); };
+  const close = () => { drawer.classList.remove('open'); overlay.classList.add('hidden'); };
+  document.getElementById('topbar-menu-btn').onclick = open;
+  drawer.querySelector('.actions-drawer-close').onclick = close;
+  overlay.onclick = close;
+  // Cerrar el drawer al tocar una acción puntual (las marcadas con data-close-menu).
+  // Las interacciones del filtro NO la llevan, así no se cierra al tildar.
+  body.onclick = e => { if (e.target.closest('[data-close-menu]')) close(); };
+
+  const badge = document.getElementById('topbar-menu-badge');
+  const setBadge = n => {
+    if (!badge) return;
+    if (n > 0) { badge.textContent = n; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+  };
+
+  return { close, setBadge, body };
+}
+
+// Limpia el menú de acciones (al cambiar de sección).
+export function clearActionsMenu() {
+  const wrap    = document.getElementById('topbar-actions');
+  const overlay = document.getElementById('actions-drawer-overlay');
+  const body    = document.getElementById('actions-drawer-body');
+  document.getElementById('actions-drawer')?.classList.remove('open');
+  if (wrap) wrap.innerHTML = '';
+  if (body) body.innerHTML = '';
+  overlay?.classList.add('hidden');
+}
+
 // --- Date / Currency formatters ---
 export function fDate(d) {
   if (!d) return '–';

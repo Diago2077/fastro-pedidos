@@ -12,7 +12,7 @@
 // ============================================================
 import { esc } from './helpers.js';
 
-export function createMultiFilter({ button, panel, defs, onChange }) {
+export function createMultiFilter({ button, panel, defs, onChange, inline = false }) {
   const selected = {};   // key -> Set<string>
   const options  = {};   // key -> [{ value, label }]
   defs.forEach(d => { selected[d.key] = new Set(); options[d.key] = []; });
@@ -124,7 +124,13 @@ export function createMultiFilter({ button, panel, defs, onChange }) {
   }
   function toggle() { panel.classList.contains('hidden') ? open() : close(); }
 
-  button?.addEventListener('click', e => { e.stopPropagation(); toggle(); });
+  // Modo inline: el panel vive dentro del menú de acciones (siempre visible),
+  // sin popover ni botón que lo abra/cierre.
+  if (!inline) {
+    button?.addEventListener('click', e => { e.stopPropagation(); toggle(); });
+  } else {
+    panel?.classList.remove('hidden');
+  }
 
-  return { setOptions, render, activeCount, passes, close };
+  return { setOptions, render, activeCount, passes, close: inline ? () => {} : close };
 }

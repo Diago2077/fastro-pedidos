@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, fNum, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, fNum, enableTableSort, enableBulkDelete, enableColumnResize, lazyRenderRows, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes, compareSize } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -16,35 +16,40 @@ export async function renderProducts(container) {
   container.innerHTML = `
     <div class="card">
       <div class="card-header">
-        <div style="width:100%;display:flex;flex-direction:column;gap:10px">
-          <div class="card-actions">
+        <div class="list-header">
+          <div class="list-toolbar">
             <div class="search-box">
               <i class="fas fa-search"></i>
               <input type="text" id="q-prod" placeholder="Buscar por código o descripción…" class="form-control">
             </div>
-            <span class="filter-anchor">
-              <button id="btn-toggle-prod-filters" type="button" class="btn btn-sm btn-outline"><i class="fas fa-filter"></i> Filtro</button>
-              <div id="prod-filters" class="filter-popover hidden"></div>
-            </span>
-            ${_canDelete ? `<button class="btn btn-sm btn-danger" id="pr-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
-            <button class="btn btn-sm btn-outline" title="Exportar PDF" onclick="window._pr.pdf()"><i class="fas fa-file-pdf"></i></button>
-            ${_canXls    ? `<button class="btn btn-sm btn-outline" title="Exportar Excel" onclick="window._pr.xls()"><i class="fas fa-file-excel"></i></button>` : ''}
-            ${_canCreate ? `<button class="btn btn-sm btn-outline" onclick="window._pr.importExcel()"><i class="fas fa-file-upload"></i> Importar</button>` : ''}
             ${_canCreate ? `<button class="btn btn-accent" onclick="window._pr.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
           </div>
+          ${_canDelete ? `<button class="btn btn-sm btn-danger bulk-action" id="pr-bulk-del" style="display:none"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
         </div>
       </div>
       <div class="table-responsive" id="pr-tbl"></div>
     </div>`;
 
+  // Menú de acciones (drawer derecho): filtros + importar/exportar
+  const _menu = mountActionsMenu({
+    title: 'Acciones · Productos',
+    bodyHTML: `
+      <div class="menu-group-title"><i class="fas fa-filter"></i> Filtros</div>
+      <div id="prod-filters"></div>
+      <div class="menu-group-title">Importar / Exportar</div>
+      ${_canCreate ? `<button class="btn btn-outline menu-action" data-close-menu onclick="window._pr.importExcel()"><i class="fas fa-file-upload"></i> Importar Excel</button>` : ''}
+      <button class="btn btn-outline menu-action" data-close-menu onclick="window._pr.pdf()"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
+      ${_canXls ? `<button class="btn btn-outline menu-action" data-close-menu onclick="window._pr.xls()"><i class="fas fa-file-excel"></i> Exportar Excel</button>` : ''}`
+  });
+
   const normTxt = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
   let _filtered = [];   // filas que pasan el filtro (para exportar lo visible)
 
-  // Filtro multi-selección (popover)
+  // Filtro multi-selección (inline, dentro del menú de acciones)
   const _filter = createMultiFilter({
-    button: document.getElementById('btn-toggle-prod-filters'),
     panel:  document.getElementById('prod-filters'),
+    inline: true,
     defs: [
       { key: 'brand',    label: 'Marca' },
       { key: 'provider', label: 'Proveedor' },
@@ -90,14 +95,8 @@ export async function renderProducts(container) {
     if (q) rows = rows.filter(p => normTxt(p.code).includes(q) || normTxt(p.description).includes(q));
     _filtered = rows;
 
-    // Indicador de filtros activos
-    const active = _filter.activeCount();
-    const fbtn = document.getElementById('btn-toggle-prod-filters');
-    if (fbtn) {
-      fbtn.innerHTML = `<i class="fas fa-filter"></i> Filtro${active ? ` (${active})` : ''}`;
-      fbtn.classList.toggle('btn-accent', active > 0);
-      fbtn.classList.toggle('btn-outline', active === 0);
-    }
+    // Indicador de filtros activos sobre el botón del menú
+    _menu.setBadge(_filter.activeCount());
 
     render(rows);
   }

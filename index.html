@@ -134,6 +134,9 @@
 
     <div class="sidebar-version">
       <span class="app-version" id="app-version" title="Versión instalada">v—</span>
+      <button class="btn btn-xs btn-outline" id="theme-toggle" title="Cambiar tema" aria-label="Cambiar tema">
+        <i class="fas fa-moon"></i>
+      </button>
       <button class="btn btn-xs btn-outline" id="force-update-btn" title="Forzar actualización (borra la caché y recarga)">
         <i class="fas fa-sync-alt"></i> Actualizar
       </button>
@@ -148,11 +151,20 @@
     <header class="topbar">
       <button id="sidebar-open" class="icon-btn"><i class="fas fa-bars"></i></button>
       <h1 class="page-title" id="page-title">Dashboard</h1>
-      <button id="theme-toggle" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema"><i class="fas fa-moon"></i></button>
       <div id="topbar-actions"></div>
     </header>
     <main id="content-area" class="content-area"></main>
   </div>
+
+  <!-- MENÚ DE ACCIONES DE LA SECCIÓN (drawer derecho) -->
+  <div id="actions-drawer-overlay" class="actions-drawer-overlay hidden"></div>
+  <aside id="actions-drawer" class="actions-drawer">
+    <div class="actions-drawer-header">
+      <h4 id="actions-drawer-title">Acciones</h4>
+      <button class="icon-btn actions-drawer-close" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="actions-drawer-body" class="actions-drawer-body"></div>
+  </aside>
 
   <!-- BOTTOM NAV (mobile/tablet) -->
   <nav class="bottom-nav">

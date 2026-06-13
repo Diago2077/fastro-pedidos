@@ -5,7 +5,7 @@ import { db } from './supabase.js';
 import { initAuth, login, logout, isAdmin,
   canViewDashboard, canViewOrders, canViewClients,
   canViewProducts, canViewProviders, canViewReports } from './auth.js';
-import { avatarInitials, closeModal, toast } from './utils/helpers.js';
+import { avatarInitials, closeModal, toast, clearActionsMenu } from './utils/helpers.js';
 import { loadSizeOrder } from './utils/sizes.js';
 import { APP_VERSION } from './version.js';
 import { renderDashboard }  from './modules/dashboard.js';
@@ -199,6 +199,9 @@ function navigate(section) {
 
   // Update page title
   document.getElementById('page-title').textContent = sections[section].title;
+
+  // Limpiar el menú de acciones de la sección anterior (cada módulo lo re-monta)
+  clearActionsMenu();
 
   // Render section
   const content = document.getElementById('content-area');

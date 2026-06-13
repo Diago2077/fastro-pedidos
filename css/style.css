@@ -265,12 +265,11 @@ a { color: inherit; text-decoration: none; }
 .sidebar-version {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   margin: 0 12px 12px;
   padding: 0 4px;
 }
-.app-version { font-size: .72em; color: rgba(255,255,255,.45); letter-spacing: .3px; }
+.app-version { font-size: .72em; color: rgba(255,255,255,.45); letter-spacing: .3px; margin-right: auto; }
 .sidebar-version .btn-outline {
   color: rgba(255,255,255,.75);
   border-color: rgba(255,255,255,.2);
@@ -301,6 +300,78 @@ a { color: inherit; text-decoration: none; }
 .update-banner > span i { color: var(--accent); margin-right: 4px; }
 
 .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 440; }
+
+/* ============================================================
+   MENÚ DE ACCIONES DE LA SECCIÓN (drawer derecho, estilo sidebar)
+   ============================================================ */
+.actions-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 455; }
+.actions-drawer {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 320px;
+  max-width: 86vw;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -4px 0 24px rgba(0,0,0,.12);
+  z-index: 460;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform var(--transition);
+}
+.actions-drawer.open { transform: translateX(0); }
+.actions-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.actions-drawer-header h4 { font-size: 1em; font-weight: 700; }
+.actions-drawer-body {
+  padding: 14px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Cada acción ocupa toda la fila, alineada a la izquierda como un menú */
+.actions-drawer-body .menu-action {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+}
+.actions-drawer-body .menu-action i { width: 18px; text-align: center; }
+/* Separador / título de grupo dentro del menú */
+.menu-group-title {
+  font-size: .72em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text-muted);
+  margin: 8px 4px 2px;
+}
+.menu-group-title:first-child { margin-top: 0; }
+/* Punto indicador de filtros activos sobre el botón del menú */
+.topbar-menu-wrap { position: relative; display: inline-flex; }
+.topbar-menu-badge {
+  position: absolute;
+  top: 4px; right: 4px;
+  min-width: 16px; height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: .62em;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
 
 /* ---- Main Wrapper ---- */
 .main-wrapper {
@@ -526,6 +597,13 @@ select.form-control { cursor: pointer; }
 .card-title { font-size: .95em; font-weight: 700; margin: 0; }
 .card-body  { padding: 16px 18px; }
 .card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Header de las vistas de lista: buscador + "Nuevo", y la acción contextual
+   "Eliminar (N)" debajo (solo visible en selección múltiple). */
+.list-header { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.list-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.list-toolbar .search-box { flex: 1 1 240px; }
+.bulk-action { align-self: flex-start; }
 
 /* ============================================================
    TABLE

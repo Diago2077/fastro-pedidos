@@ -1,7 +1,10 @@
 import { db } from '../supabase.js';
 import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableColumnResize, lazyRenderRows, enableRowClick, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
+import { createMultiFilter } from '../utils/filters.js';
 import { canExportExcel, canCreateClients, canEditClients, canDeleteClients } from '../auth.js';
+
+const normTxt = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 const COLS = [
   { key: 'code',       header: 'Código',   width: 10 },
@@ -23,7 +26,7 @@ export async function renderClients(container) {
           <div class="list-toolbar">
             <div class="search-box">
               <i class="fas fa-search"></i>
-              <input type="text" id="q-clients" placeholder="Buscar cliente…" class="form-control">
+              <input type="text" id="q-clients" placeholder="Buscar por código, nombre, tienda o RUC…" class="form-control">
             </div>
             ${canCreateClients() ? `<button class="btn btn-accent" title="Nuevo cliente" onclick="window._cl.form()"><i class="fas fa-plus"></i></button>` : ''}
           </div>
@@ -32,27 +35,51 @@ export async function renderClients(container) {
       <div class="table-responsive" id="cl-tbl"></div>
     </div>`;
 
-  // Menú de acciones (drawer derecho): importar / exportar
-  mountActionsMenu({
+  // Menú de acciones (drawer derecho): filtros + importar / exportar
+  const _menu = mountActionsMenu({
     title: 'Acciones · Clientes',
     bodyHTML: `
+      <div class="menu-group-title"><i class="fas fa-filter"></i> Filtros</div>
+      <div id="cl-filters"></div>
       <div class="menu-group-title">Importar / Exportar</div>
       ${canCreateClients() ? `<button class="btn btn-outline menu-action" data-close-menu onclick="window._cl.importExcel()"><i class="fas fa-file-upload"></i> Importar Excel</button>` : ''}
       <button class="btn btn-outline menu-action" data-close-menu onclick="window._cl.pdf()"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
       ${canExportExcel() ? `<button class="btn btn-outline menu-action" data-close-menu onclick="window._cl.xls()"><i class="fas fa-file-excel"></i> Exportar Excel</button>` : ''}`
   });
 
-  async function load(q = '') {
+  // Filtro multi-selección (inline, dentro del menú de acciones)
+  const _filter = createMultiFilter({
+    panel:  document.getElementById('cl-filters'),
+    inline: true,
+    defs:   [{ key: 'city', label: 'Ciudad', multi: true }],
+    onChange: applyFilters
+  });
+  const _getters = { city: c => c.city || '' };
+
+  async function load() {
     const tbl = document.getElementById('cl-tbl');
     if (tbl) tbl.innerHTML = loadingHTML();
-    const { data, error } = await fetchAllRows(() => {
-      let cq = db.from('clients').select('*').eq('active', true).order('code', { ascending: false, nullsFirst: false });
-      if (q) cq = cq.ilike('name', `%${q}%`);
-      return cq;
-    });
+    const { data, error } = await fetchAllRows(() =>
+      db.from('clients').select('*').eq('active', true).order('code', { ascending: false, nullsFirst: false }));
     if (error) { if (tbl) tbl.innerHTML = emptyState('Error al cargar clientes'); toast('Error al cargar clientes', 'error'); return; }
     _all = data || [];
-    render(_all);
+    populateFilters();
+    applyFilters();
+  }
+
+  function populateFilters() {
+    const cities = new Set();
+    _all.forEach(c => { if (c.city) cities.add(c.city); });
+    _filter.setOptions('city', [...cities].sort((a, b) => a.localeCompare(b)).map(c => ({ value: c, label: c })));
+    _filter.render();
+  }
+
+  function applyFilters() {
+    const q = normTxt(document.getElementById('q-clients')?.value.trim() || '');
+    let rows = _all.filter(_filter.passes(_getters));
+    if (q) rows = rows.filter(c => [c.code, c.name, c.store_name, c.ruc].some(f => normTxt(f).includes(q)));
+    _menu.setBadge(_filter.activeCount());
+    render(rows);
   }
 
   function render(rows) {
@@ -172,7 +199,7 @@ export async function renderClients(container) {
     downloadTemplate: downloadClientTemplate
   };
 
-  document.getElementById('q-clients')?.addEventListener('input', debounce(e => load(e.target.value.trim()), 300));
+  document.getElementById('q-clients')?.addEventListener('input', debounce(applyFilters, 250));
   load();
 }
 

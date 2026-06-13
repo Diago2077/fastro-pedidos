@@ -87,7 +87,7 @@ export async function renderOrders(container) {
 
   // Filtro multi-selección (popover). El Estado es single-select (un estado a la
   // vez) y arranca en "Abierto": la tabla muestra solo los pedidos de ese estado.
-  const _filterDefs = [{ key: 'status', label: 'Estado', single: true, default: 'open' }];
+  const _filterDefs = [{ key: 'status', label: 'Estado', dropdown: true, default: 'open' }];
   _filterDefs.push({ key: 'client', label: 'Cliente' });
   if (isAdmin()) _filterDefs.push({ key: 'seller', label: 'Vendedor' });
   _filterDefs.push({ key: 'season', label: 'Temporada' });
@@ -142,7 +142,8 @@ export async function renderOrders(container) {
     _filter.setOptions('status', [
       { value: 'open',   label: 'Abierto' },
       { value: 'sent',   label: 'Enviado' },
-      { value: 'closed', label: 'Cerrado' }
+      { value: 'closed', label: 'Cerrado' },
+      { value: '',       label: 'Todos' }
     ]);
     _filter.render();
   }

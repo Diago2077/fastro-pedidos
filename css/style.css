@@ -1401,6 +1401,7 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
 .filter-option:hover { background: var(--border-light); }
 .filter-option input { accent-color: var(--accent); width: 15px; height: 15px; flex: 0 0 auto; }
 .filter-empty { font-size: .82em; color: var(--text-muted); padding: 4px 6px; }
+.filter-select { width: 100%; height: auto; padding: 6px 8px; font-size: .9em; }
 .filter-popover-footer {
   border-top: 1px solid var(--border);
   padding-top: 8px;

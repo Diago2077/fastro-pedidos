@@ -19,7 +19,7 @@ export function createMultiFilter({ button, panel, defs, onChange, inline = fals
   // Con `default` arranca pre-seleccionada (p.ej. estado "Abierto" en Pedidos).
   defs.forEach(d => {
     options[d.key] = [];
-    selected[d.key] = (d.single && d.default != null) ? new Set([String(d.default)]) : new Set();
+    selected[d.key] = ((d.single || d.dropdown) && d.default != null) ? new Set([String(d.default)]) : new Set();
   });
 
   function setOptions(key, opts) {
@@ -30,8 +30,8 @@ export function createMultiFilter({ button, panel, defs, onChange, inline = fals
   }
 
   function activeCount() {
-    // Las defs `single` (estado) están siempre activas, no cuentan como "filtro extra".
-    return defs.reduce((n, d) => n + (!d.single && selected[d.key].size ? 1 : 0), 0);
+    // Las defs `single`/`dropdown` (estado) son el control principal: no cuentan como "filtro extra".
+    return defs.reduce((n, d) => n + (!d.single && !d.dropdown && selected[d.key].size ? 1 : 0), 0);
   }
 
   function getSelected(key) { return [...(selected[key] || [])]; }
@@ -41,22 +41,32 @@ export function createMultiFilter({ button, panel, defs, onChange, inline = fals
     panel.innerHTML = defs.map(d => {
       const sel = selected[d.key];
       const opts = options[d.key];
-      const type = d.single ? 'radio' : 'checkbox';
-      const nameAttr = d.single ? ` name="filter-${esc(d.key)}"` : '';
+      // dropdown: <select> (un valor a la vez). single: radios. resto: checkboxes.
+      let body;
+      if (d.dropdown) {
+        const cur = [...sel][0] ?? '';
+        body = opts.length
+          ? `<select class="form-control filter-select" data-key="${esc(d.key)}">
+              ${opts.map(o => { const v = String(o.value); return `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(o.label)}</option>`; }).join('')}
+            </select>`
+          : `<div class="filter-empty">— sin opciones —</div>`;
+      } else {
+        const type = d.single ? 'radio' : 'checkbox';
+        const nameAttr = d.single ? ` name="filter-${esc(d.key)}"` : '';
+        body = opts.length
+          ? opts.map(o => {
+              const val = String(o.value);
+              return `<label class="filter-option">
+                <input type="${type}"${nameAttr} data-key="${esc(d.key)}" value="${esc(val)}" ${sel.has(val) ? 'checked' : ''}>
+                <span>${esc(o.label)}</span>
+              </label>`;
+            }).join('')
+          : `<div class="filter-empty">— sin opciones —</div>`;
+      }
       return `
       <div class="filter-group">
-        <div class="filter-group-title">${esc(d.label)}${(!d.single && sel.size) ? ` <span class="filter-group-count">${sel.size}</span>` : ''}</div>
-        <div class="filter-options">
-          ${opts.length
-            ? opts.map(o => {
-                const val = String(o.value);
-                return `<label class="filter-option">
-                  <input type="${type}"${nameAttr} data-key="${esc(d.key)}" value="${esc(val)}" ${sel.has(val) ? 'checked' : ''}>
-                  <span>${esc(o.label)}</span>
-                </label>`;
-              }).join('')
-            : `<div class="filter-empty">— sin opciones —</div>`}
-        </div>
+        <div class="filter-group-title">${esc(d.label)}${(!d.single && !d.dropdown && sel.size) ? ` <span class="filter-group-count">${sel.size}</span>` : ''}</div>
+        <div class="filter-options">${body}</div>
       </div>`;
     }).join('') + `
       <div class="filter-popover-footer">
@@ -73,14 +83,14 @@ export function createMultiFilter({ button, panel, defs, onChange, inline = fals
     });
   }
 
-  // ---- Cambios en checkboxes (delegación) ----
+  // ---- Cambios en checkbox / radio / select (delegación) ----
   panel?.addEventListener('change', e => {
-    const inp = e.target.closest('input[data-key]');
+    const inp = e.target.closest('input[data-key], select[data-key]');
     if (!inp) return;
     const def = defs.find(d => d.key === inp.dataset.key);
-    if (def?.single) {
-      // Radio: una sola opción a la vez (siempre queda una elegida).
-      selected[inp.dataset.key] = new Set([inp.value]);
+    if (def?.single || def?.dropdown) {
+      // Radio o <select>: un valor a la vez. Vacío ("Todos") => sin filtro.
+      selected[inp.dataset.key] = inp.value ? new Set([inp.value]) : new Set();
     } else {
       const set = selected[inp.dataset.key];
       if (inp.checked) set.add(inp.value); else set.delete(inp.value);
@@ -96,8 +106,8 @@ export function createMultiFilter({ button, panel, defs, onChange, inline = fals
 
   panel?.addEventListener('click', e => {
     if (e.target.closest('[data-filter-clear]')) {
-      // Las defs `single` vuelven a su valor por defecto; las demás se vacían.
-      defs.forEach(d => { selected[d.key] = (d.single && d.default != null) ? new Set([String(d.default)]) : new Set(); });
+      // Las defs `single`/`dropdown` vuelven a su valor por defecto; las demás se vacían.
+      defs.forEach(d => { selected[d.key] = ((d.single || d.dropdown) && d.default != null) ? new Set([String(d.default)]) : new Set(); });
       render();
       onChange?.();
     }

@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableColumnResize, lazyRenderRows, mountActionsMenu } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableColumnResize, lazyRenderRows, enableRowClick, mountActionsMenu } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateProviders, canEditProviders, canDeleteProviders } from '../auth.js';
 
@@ -46,7 +46,7 @@ export async function renderProviders(container) {
     const el = document.getElementById('pv-tbl');
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay proveedores registrados'); return; }
-    const rowsHTML = rows.map(p => `<tr>
+    const rowsHTML = rows.map(p => `<tr data-id="${p.id}">
       <td class="td-actions col-ver">
         ${canEditProviders() ? `<button class="btn btn-xs btn-outline" title="Editar" onclick="window._pv.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
       </td>
@@ -62,6 +62,7 @@ export async function renderProviders(container) {
     const lazy = lazyRenderRows(table, rowsHTML);
     enableTableSort(table, { onBeforeSort: lazy.renderAll });
     enableColumnResize(table);
+    if (canEditProviders()) enableRowClick(table, id => window._pv.form(id));
   }
 
   function formHTML(p = {}) {

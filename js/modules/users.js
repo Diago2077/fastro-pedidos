@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, esc, enableTableSort, enableColumnResize, lazyRenderRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, esc, enableTableSort, enableColumnResize, lazyRenderRows, enableRowClick } from '../utils/helpers.js';
 import { getSession } from '../auth.js';
 
 export async function renderUsers(container) {
@@ -27,7 +27,7 @@ export async function renderUsers(container) {
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay usuarios'); return; }
     const currentId = getSession()?.id;
-    const rowsHTML = rows.map(u => `<tr>
+    const rowsHTML = rows.map(u => `<tr data-id="${u.id}">
       <td class="td-actions col-ver">
         <button class="btn btn-xs btn-outline" title="Editar" onclick="window._usr.form('${u.id}')"><i class="fas fa-edit"></i></button>
         ${u.id !== currentId ? `<button class="btn btn-xs btn-danger-outline" title="${u.active ? 'Desactivar' : 'Activar'}" onclick="window._usr.toggle('${u.id}', ${u.active})">
@@ -48,6 +48,7 @@ export async function renderUsers(container) {
     const lazy = lazyRenderRows(table, rowsHTML);
     enableTableSort(table, { onBeforeSort: lazy.renderAll });
     enableColumnResize(table);
+    enableRowClick(table, id => window._usr.form(id));
   }
 
   function formHTML(u = {}) {

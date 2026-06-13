@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableColumnResize, lazyRenderRows, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, enableTableSort, enableColumnResize, lazyRenderRows, enableRowClick, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canExportExcel, canCreateClients, canEditClients, canDeleteClients } from '../auth.js';
 
@@ -59,7 +59,7 @@ export async function renderClients(container) {
     const el = document.getElementById('cl-tbl');
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay clientes registrados'); return; }
-    const rowsHTML = rows.map(c => `<tr>
+    const rowsHTML = rows.map(c => `<tr data-id="${c.id}">
       <td class="td-actions col-ver">
         <button class="btn btn-xs btn-outline" title="Ver detalle" onclick="window._cl.view('${c.id}')"><i class="fas fa-eye"></i></button>
       </td>
@@ -77,6 +77,7 @@ export async function renderClients(container) {
     const lazy = lazyRenderRows(table, rowsHTML);
     enableTableSort(table, { onBeforeSort: lazy.renderAll });
     enableColumnResize(table);
+    enableRowClick(table, id => window._cl.view(id));
   }
 
   function formHTML(c = {}) {

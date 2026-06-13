@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, confirmDialog, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableColumnResize, lazyRenderRows, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, confirmDialog, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableColumnResize, lazyRenderRows, enableRowClick, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -164,7 +164,7 @@ export async function renderOrders(container) {
     const rowsHTML = rows.map(o => {
       const sub = totByOrder[o.id] || 0;
       const tot = sub * (1 - (o.discount_pct || 0) / 100);
-      return `<tr>
+      return `<tr data-id="${o.id}">
         <td class="td-actions col-ver">
           <button class="btn btn-xs btn-outline" title="Ver / Editar" onclick="window._ord.open('${o.id}')"><i class="fas fa-eye"></i></button>
         </td>
@@ -187,6 +187,7 @@ export async function renderOrders(container) {
     const lazy = lazyRenderRows(table, rowsHTML);
     enableTableSort(table, { onBeforeSort: lazy.renderAll });
     enableColumnResize(table);
+    enableRowClick(table, id => window._ord.open(id));
   }
 
   // Use Object.assign so updateQty / removeItem defined at module level are not overwritten

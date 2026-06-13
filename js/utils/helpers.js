@@ -292,6 +292,20 @@ export function enableTableSort(table, { onBeforeSort } = {}) {
   });
 }
 
+// --- Fila clicable: abrir el detalle tocando cualquier parte de la fila ---
+// handler(id) recibe el data-id de la fila. Ignora clicks sobre controles
+// (botones, links, inputs, estado) para no pisar sus propias acciones.
+export function enableRowClick(table, handler) {
+  if (!table || typeof handler !== 'function') return;
+  table.classList.add('rows-clickable');
+  table.addEventListener('click', e => {
+    if (e.target.closest('button, a, input, select, label, .status-btn')) return;
+    const tr = e.target.closest('tbody tr');
+    const id = tr?.dataset.id;
+    if (id) handler(id);
+  });
+}
+
 // --- Render por tramos (infinite scroll dentro de la tabla) ---
 // En vez de inyectar miles de <tr> de una, va agregando filas a medida que se
 // scrollea el contenedor (.table-responsive), usando un IntersectionObserver

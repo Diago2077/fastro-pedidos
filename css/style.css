@@ -719,6 +719,9 @@ select.form-control { cursor: pointer; }
 .col-ver { width: 1%; white-space: nowrap; }
 th.col-ver, .td-actions.col-ver { text-align: center; }
 
+/* Filas clicables: toda la fila abre el detalle (el ícono queda como pista) */
+.rows-clickable tbody tr { cursor: pointer; }
+
 /* Encabezados ordenables */
 .sortable-th { cursor: pointer; user-select: none; }
 .sortable-th:hover { color: var(--text); }

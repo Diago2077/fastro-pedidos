@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, fNum, enableTableSort, enableColumnResize, lazyRenderRows, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, emptyState, loadingHTML, setLoading, debounce, esc, fCurrency, fNum, enableTableSort, enableColumnResize, lazyRenderRows, enableRowClick, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes, compareSize } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -156,7 +156,7 @@ export async function renderProducts(container) {
           <button class="btn btn-xs btn-outline" title="Ver detalle" onclick="window._pr.view('${p.id}')"><i class="fas fa-eye"></i></button>
         </td>`;
 
-      const makeRow = (sizes, priceLabel) => `<tr>
+      const makeRow = (sizes, priceLabel) => `<tr data-id="${p.id}">
         ${actionCell}
         <td><strong>${esc(p.code)}</strong></td>
         <td>${esc(p.description)}</td>
@@ -179,6 +179,7 @@ export async function renderProducts(container) {
     const lazy = lazyRenderRows(table, rowsHTML);
     enableTableSort(table, { onBeforeSort: lazy.renderAll });
     enableColumnResize(table);
+    enableRowClick(table, id => window._pr.view(id));
   }
 
   window._pr = {

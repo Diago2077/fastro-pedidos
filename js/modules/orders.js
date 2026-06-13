@@ -85,10 +85,12 @@ export async function renderOrders(container) {
 
   let _totByOrder = {};
 
-  // Filtro multi-selección (popover)
-  const _filterDefs = [{ key: 'client', label: 'Cliente' }];
+  // Filtro multi-selección (popover). El Estado es single-select (un estado a la
+  // vez) y arranca en "Abierto": la tabla muestra solo los pedidos de ese estado.
+  const _filterDefs = [{ key: 'status', label: 'Estado', single: true, default: 'open' }];
+  _filterDefs.push({ key: 'client', label: 'Cliente' });
   if (isAdmin()) _filterDefs.push({ key: 'seller', label: 'Vendedor' });
-  _filterDefs.push({ key: 'season', label: 'Temporada' }, { key: 'status', label: 'Estado' });
+  _filterDefs.push({ key: 'season', label: 'Temporada' });
 
   const _filter = createMultiFilter({
     panel:  document.getElementById('ord-filters'),
@@ -138,9 +140,9 @@ export async function renderOrders(container) {
     if (isAdmin()) _filter.setOptions('seller', [...sellers.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])).map(([v, l]) => ({ value: v, label: l })));
     _filter.setOptions('season', [...seasons].sort().map(s => ({ value: s, label: s })));
     _filter.setOptions('status', [
-      { value: 'open',   label: 'Abiertos' },
-      { value: 'closed', label: 'Cerrados' },
-      { value: 'sent',   label: 'Enviados' }
+      { value: 'open',   label: 'Abierto' },
+      { value: 'sent',   label: 'Enviado' },
+      { value: 'closed', label: 'Cerrado' }
     ]);
     _filter.render();
   }
@@ -160,7 +162,11 @@ export async function renderOrders(container) {
   function render(rows, totByOrder = {}) {
     const el = document.getElementById('ord-tbl');
     if (!el) return;
-    if (!rows.length) { el.innerHTML = emptyState('No hay pedidos'); return; }
+    if (!rows.length) {
+      const st = _filter.getSelected('status')[0];
+      const stTxt = { open: ' abiertos', sent: ' enviados', closed: ' cerrados' }[st] || '';
+      el.innerHTML = emptyState(`No hay pedidos${stTxt}`); return;
+    }
     const rowsHTML = rows.map(o => {
       const sub = totByOrder[o.id] || 0;
       const tot = sub * (1 - (o.discount_pct || 0) / 100);

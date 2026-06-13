@@ -15,7 +15,12 @@ import { esc } from './helpers.js';
 export function createMultiFilter({ button, panel, defs, onChange, inline = false }) {
   const selected = {};   // key -> Set<string>
   const options  = {};   // key -> [{ value, label }]
-  defs.forEach(d => { selected[d.key] = new Set(); options[d.key] = []; });
+  // Una def con `single: true` se comporta como radio (una sola opción a la vez).
+  // Con `default` arranca pre-seleccionada (p.ej. estado "Abierto" en Pedidos).
+  defs.forEach(d => {
+    options[d.key] = [];
+    selected[d.key] = (d.single && d.default != null) ? new Set([String(d.default)]) : new Set();
+  });
 
   function setOptions(key, opts) {
     options[key] = opts || [];
@@ -25,23 +30,28 @@ export function createMultiFilter({ button, panel, defs, onChange, inline = fals
   }
 
   function activeCount() {
-    return defs.reduce((n, d) => n + (selected[d.key].size ? 1 : 0), 0);
+    // Las defs `single` (estado) están siempre activas, no cuentan como "filtro extra".
+    return defs.reduce((n, d) => n + (!d.single && selected[d.key].size ? 1 : 0), 0);
   }
+
+  function getSelected(key) { return [...(selected[key] || [])]; }
 
   function render() {
     if (!panel) return;
     panel.innerHTML = defs.map(d => {
       const sel = selected[d.key];
       const opts = options[d.key];
+      const type = d.single ? 'radio' : 'checkbox';
+      const nameAttr = d.single ? ` name="filter-${esc(d.key)}"` : '';
       return `
       <div class="filter-group">
-        <div class="filter-group-title">${esc(d.label)}${sel.size ? ` <span class="filter-group-count">${sel.size}</span>` : ''}</div>
+        <div class="filter-group-title">${esc(d.label)}${(!d.single && sel.size) ? ` <span class="filter-group-count">${sel.size}</span>` : ''}</div>
         <div class="filter-options">
           ${opts.length
             ? opts.map(o => {
                 const val = String(o.value);
                 return `<label class="filter-option">
-                  <input type="checkbox" data-key="${esc(d.key)}" value="${esc(val)}" ${sel.has(val) ? 'checked' : ''}>
+                  <input type="${type}"${nameAttr} data-key="${esc(d.key)}" value="${esc(val)}" ${sel.has(val) ? 'checked' : ''}>
                   <span>${esc(o.label)}</span>
                 </label>`;
               }).join('')
@@ -65,22 +75,29 @@ export function createMultiFilter({ button, panel, defs, onChange, inline = fals
 
   // ---- Cambios en checkboxes (delegación) ----
   panel?.addEventListener('change', e => {
-    const chk = e.target.closest('input[type=checkbox][data-key]');
-    if (!chk) return;
-    const set = selected[chk.dataset.key];
-    if (chk.checked) set.add(chk.value); else set.delete(chk.value);
-    // Actualizar el contador del grupo sin re-render completo
-    const title = chk.closest('.filter-group')?.querySelector('.filter-group-title');
-    if (title) {
-      const base = title.childNodes[0]?.textContent || '';
-      title.innerHTML = `${esc(base.trim())}${set.size ? ` <span class="filter-group-count">${set.size}</span>` : ''}`;
+    const inp = e.target.closest('input[data-key]');
+    if (!inp) return;
+    const def = defs.find(d => d.key === inp.dataset.key);
+    if (def?.single) {
+      // Radio: una sola opción a la vez (siempre queda una elegida).
+      selected[inp.dataset.key] = new Set([inp.value]);
+    } else {
+      const set = selected[inp.dataset.key];
+      if (inp.checked) set.add(inp.value); else set.delete(inp.value);
+      // Actualizar el contador del grupo sin re-render completo
+      const title = inp.closest('.filter-group')?.querySelector('.filter-group-title');
+      if (title) {
+        const base = title.childNodes[0]?.textContent || '';
+        title.innerHTML = `${esc(base.trim())}${set.size ? ` <span class="filter-group-count">${set.size}</span>` : ''}`;
+      }
     }
     onChange?.();
   });
 
   panel?.addEventListener('click', e => {
     if (e.target.closest('[data-filter-clear]')) {
-      defs.forEach(d => selected[d.key].clear());
+      // Las defs `single` vuelven a su valor por defecto; las demás se vacían.
+      defs.forEach(d => { selected[d.key] = (d.single && d.default != null) ? new Set([String(d.default)]) : new Set(); });
       render();
       onChange?.();
     }
@@ -132,5 +149,5 @@ export function createMultiFilter({ button, panel, defs, onChange, inline = fals
     panel?.classList.remove('hidden');
   }
 
-  return { setOptions, render, activeCount, passes, close: inline ? () => {} : close };
+  return { setOptions, render, activeCount, passes, getSelected, close: inline ? () => {} : close };
 }

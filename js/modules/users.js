@@ -28,11 +28,6 @@ export async function renderUsers(container) {
     if (!rows.length) { el.innerHTML = emptyState('No hay usuarios'); return; }
     const currentId = getSession()?.id;
     const rowsHTML = rows.map(u => `<tr data-id="${u.id}">
-      <td class="td-actions col-ver">
-        <button class="btn btn-xs btn-outline" title="Editar" onclick="window._usr.form('${u.id}')"><i class="fas fa-edit"></i></button>
-        ${u.id !== currentId ? `<button class="btn btn-xs btn-danger-outline" title="${u.active ? 'Desactivar' : 'Activar'}" onclick="window._usr.toggle('${u.id}', ${u.active})">
-          <i class="fas fa-${u.active ? 'ban' : 'check'}"></i></button>` : ''}
-      </td>
       <td><strong>${esc(u.name || '—')}</strong>${u.id === currentId ? ' <span class="badge badge-info">Yo</span>' : ''}</td>
       <td>${esc(u.email)}</td>
       <td><span class="badge ${u.role === 'admin' ? 'badge-danger' : 'badge-secondary'}">${u.role === 'admin' ? 'Admin' : 'Usuario'}</span></td>
@@ -41,14 +36,31 @@ export async function renderUsers(container) {
     </tr>`);
 
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th class="col-ver no-sort"></th><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Creado</th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Creado</th></tr></thead>
       <tbody></tbody>
     </table>`;
     const table = el.querySelector('table');
     const lazy = lazyRenderRows(table, rowsHTML);
     enableTableSort(table, { onBeforeSort: lazy.renderAll });
     enableColumnResize(table);
-    enableRowClick(table, id => window._usr.form(id));
+    enableRowClick(table, id => window._usr.view(id));
+  }
+
+  function detailHTML(u, currentId) {
+    const row = (label, val) =>
+      `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${esc(val == null || val === '' ? '–' : String(val))}</span></div>`;
+    return `<div class="client-detail">
+      ${row('Nombre', u.name)}
+      ${row('Correo', u.email)}
+      ${row('Rol', u.role === 'admin' ? 'Admin' : 'Usuario')}
+      ${row('Estado', u.active ? 'Activo' : 'Inactivo')}
+      ${row('Creado', u.created_at ? new Date(u.created_at).toLocaleDateString('es-PY') : '')}
+    </div>
+    <div class="form-footer">
+      ${u.id !== currentId ? `<button type="button" class="btn btn-danger-outline" style="margin-right:auto" title="${u.active ? 'Desactivar' : 'Activar'}" onclick="window._usr.toggle('${u.id}', ${u.active})"><i class="fas fa-${u.active ? 'ban' : 'check'}"></i></button>` : ''}
+      <button type="button" class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
+      <button type="button" class="btn btn-accent" onclick="window._usr.form('${u.id}')"><i class="fas fa-edit"></i> Editar</button>
+    </div>`;
   }
 
   function formHTML(u = {}) {
@@ -146,6 +158,11 @@ export async function renderUsers(container) {
   }
 
   window._usr = {
+    async view(id) {
+      const { data } = await db.from('profiles').select('id, name, email, role, active, created_at').eq('id', id).single();
+      if (!data) { toast('No se pudo cargar el usuario', 'error'); return; }
+      openModal('Detalle del Usuario', detailHTML(data, getSession()?.id));
+    },
     async form(id) {
       const { data } = await db.from('profiles').select('*').eq('id', id).single();
       const u = data || {};
@@ -199,8 +216,9 @@ export async function renderUsers(container) {
     async toggle(id, active) {
       const msg = active ? '¿Desactivar este usuario?' : '¿Reactivar este usuario?';
       if (!await confirm2(msg)) return;
-      await db.from('profiles').update({ active: !active }).eq('id', id);
-      toast(active ? 'Usuario desactivado' : 'Usuario reactivado'); load();
+      const { error } = await db.from('profiles').update({ active: !active }).eq('id', id);
+      if (error) { toast('Error: ' + error.message, 'error'); return; }
+      toast(active ? 'Usuario desactivado' : 'Usuario reactivado'); closeModal(true); load();
     }
   };
 

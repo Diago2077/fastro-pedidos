@@ -25,7 +25,7 @@ export async function renderClients(container) {
               <i class="fas fa-search"></i>
               <input type="text" id="q-clients" placeholder="Buscar cliente…" class="form-control">
             </div>
-            ${canCreateClients() ? `<button class="btn btn-accent" onclick="window._cl.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
+            ${canCreateClients() ? `<button class="btn btn-accent" title="Nuevo cliente" onclick="window._cl.form()"><i class="fas fa-plus"></i></button>` : ''}
           </div>
         </div>
       </div>
@@ -60,9 +60,6 @@ export async function renderClients(container) {
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay clientes registrados'); return; }
     const rowsHTML = rows.map(c => `<tr data-id="${c.id}">
-      <td class="td-actions col-ver">
-        <button class="btn btn-xs btn-outline" title="Ver detalle" onclick="window._cl.view('${c.id}')"><i class="fas fa-eye"></i></button>
-      </td>
       <td><strong>${c.code ?? '–'}</strong></td>
       <td>${esc(c.name)}</td>
       <td>${esc(c.store_name || '–')}</td>
@@ -70,7 +67,7 @@ export async function renderClients(container) {
     </tr>`);
 
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th class="col-ver no-sort"></th><th>Código</th><th>Nombre</th><th>Tienda</th><th>Ciudad</th></tr></thead>
+      <thead><tr><th>Código</th><th>Nombre</th><th>Tienda</th><th>Ciudad</th></tr></thead>
       <tbody></tbody>
     </table>`;
     const table = el.querySelector('table');
@@ -130,7 +127,7 @@ export async function renderClients(container) {
       ${row('Correo', c.email)}
     </div>
     <div class="form-footer">
-      ${canDeleteClients() ? `<button type="button" class="btn btn-danger-outline" style="margin-right:auto" onclick="window._cl.del('${c.id}')"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
+      ${canDeleteClients() ? `<button type="button" class="btn btn-danger-outline" style="margin-right:auto" title="Eliminar" onclick="window._cl.del('${c.id}')"><i class="fas fa-trash"></i></button>` : ''}
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
       ${canEditClients() ? `<button type="button" class="btn btn-accent" onclick="window._cl.form('${c.id}')"><i class="fas fa-edit"></i> Editar</button>` : ''}
     </div>`;

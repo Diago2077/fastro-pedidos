@@ -68,7 +68,7 @@ export async function renderOrders(container) {
               <i class="fas fa-search"></i>
               <input type="text" id="q-ord" placeholder="Buscar por N° o cliente…" class="form-control">
             </div>
-            ${canCreateOrders() ? `<button class="btn btn-accent" onclick="window._ord.new()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
+            ${canCreateOrders() ? `<button class="btn btn-accent" title="Nuevo pedido" onclick="window._ord.new()"><i class="fas fa-plus"></i></button>` : ''}
           </div>
         </div>
       </div>
@@ -165,13 +165,9 @@ export async function renderOrders(container) {
       const sub = totByOrder[o.id] || 0;
       const tot = sub * (1 - (o.discount_pct || 0) / 100);
       return `<tr data-id="${o.id}">
-        <td class="td-actions col-ver">
-          <button class="btn btn-xs btn-outline" title="Ver / Editar" onclick="window._ord.open('${o.id}')"><i class="fas fa-eye"></i></button>
-        </td>
         <td><strong>${esc(o.order_number)}</strong></td>
         <td>${esc(o.clients?.name || '–')}</td>
         <td>${esc(o.users?.name || '–')}</td>
-        <td>${esc(o.providers?.name || '–')}</td>
         <td>${esc(o.season || '–')}</td>
         <td>${fCurrency(tot)}</td>
         <td><button class="status-btn status-${o.status}" onclick="window._ord.changeStatus('${o.id}','${o.status}')">${STATUS_LABELS[o.status] || o.status}</button></td>
@@ -180,7 +176,7 @@ export async function renderOrders(container) {
     });
 
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th class="col-ver no-sort"></th><th>N° Pedido</th><th>Cliente</th><th>Vendedor</th><th>Proveedor</th><th>Temporada</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead>
+      <thead><tr><th>N° Pedido</th><th>Cliente</th><th>Vendedor</th><th>Temporada</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead>
       <tbody></tbody>
     </table>`;
     const table = el.querySelector('table');
@@ -560,7 +556,7 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
 
     <!-- FOOTER -->
     <div class="form-footer">
-      ${(orderId && canDeleteOrders()) ? `<button type="button" class="btn btn-danger-outline" onclick="window._ord.del('${orderId}')"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
+      ${(orderId && canDeleteOrders()) ? `<button type="button" class="btn btn-danger-outline" title="Eliminar" onclick="window._ord.del('${orderId}')"><i class="fas fa-trash"></i></button>` : ''}
       <button type="button" class="btn btn-outline" id="btn-print-order" title="Imprimir / PDF"><i class="fas fa-file-pdf"></i></button>
       ${canExportExcel() ? `<button type="button" class="btn btn-outline" id="btn-excel-order" title="Exportar Excel"><i class="fas fa-file-excel"></i></button>` : ''}
       <button type="button" class="btn btn-secondary" style="margin-left:auto" onclick="closeModal()">Cancelar</button>

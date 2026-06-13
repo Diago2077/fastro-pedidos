@@ -21,7 +21,7 @@ export async function renderProducts(container) {
               <i class="fas fa-search"></i>
               <input type="text" id="q-prod" placeholder="Buscar por código o descripción…" class="form-control">
             </div>
-            ${_canCreate ? `<button class="btn btn-accent" onclick="window._pr.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
+            ${_canCreate ? `<button class="btn btn-accent" title="Nuevo producto" onclick="window._pr.form()"><i class="fas fa-plus"></i></button>` : ''}
           </div>
         </div>
       </div>
@@ -152,12 +152,7 @@ export async function renderProducts(container) {
         .map(([price, sizeSet]) => ({ price, sizes: sortSizes([...sizeSet]) }))
         .sort((a, b) => compareSize(a.sizes[0], b.sizes[0]));
 
-      const actionCell = `<td class="td-actions col-ver">
-          <button class="btn btn-xs btn-outline" title="Ver detalle" onclick="window._pr.view('${p.id}')"><i class="fas fa-eye"></i></button>
-        </td>`;
-
       const makeRow = (sizes, priceLabel) => `<tr data-id="${p.id}">
-        ${actionCell}
         <td><strong>${esc(p.code)}</strong></td>
         <td>${esc(p.description)}</td>
         <td>${esc(p.brand || '–')}</td>
@@ -172,7 +167,7 @@ export async function renderProducts(container) {
     });
 
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th class="col-ver no-sort"></th><th>Código</th><th>Descripción</th><th>Marca</th><th>Tallas</th><th class="text-end">Precio Venta</th></tr></thead>
+      <thead><tr><th>Código</th><th>Descripción</th><th>Marca</th><th>Tallas</th><th class="text-end">Precio Venta</th></tr></thead>
       <tbody></tbody>
     </table>`;
     const table = el.querySelector('table');
@@ -275,7 +270,7 @@ function productDetailHTML(p) {
   <div class="detail-subtitle"><i class="fas fa-ruler"></i> Tallas y precio de venta</div>
   <div class="client-detail">${sizesBlock}</div>
   <div class="form-footer">
-    ${canDeleteProducts() ? `<button type="button" class="btn btn-danger-outline" style="margin-right:auto" onclick="window._pr.del('${p.id}')"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
+    ${canDeleteProducts() ? `<button type="button" class="btn btn-danger-outline" style="margin-right:auto" title="Eliminar" onclick="window._pr.del('${p.id}')"><i class="fas fa-trash"></i></button>` : ''}
     <button type="button" class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
     ${canEditProducts() ? `<button type="button" class="btn btn-accent" onclick="window._pr.form('${p.id}')"><i class="fas fa-edit"></i> Editar</button>` : ''}
   </div>`;

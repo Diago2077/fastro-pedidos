@@ -15,7 +15,7 @@ export async function renderProviders(container) {
               <i class="fas fa-search"></i>
               <input type="text" id="q-prov" placeholder="Buscar proveedor…" class="form-control">
             </div>
-            ${canCreateProviders() ? `<button class="btn btn-accent" onclick="window._pv.form()"><i class="fas fa-plus"></i> Nuevo</button>` : ''}
+            ${canCreateProviders() ? `<button class="btn btn-accent" title="Nuevo proveedor" onclick="window._pv.form()"><i class="fas fa-plus"></i></button>` : ''}
           </div>
         </div>
       </div>
@@ -47,22 +47,19 @@ export async function renderProviders(container) {
     if (!el) return;
     if (!rows.length) { el.innerHTML = emptyState('No hay proveedores registrados'); return; }
     const rowsHTML = rows.map(p => `<tr data-id="${p.id}">
-      <td class="td-actions col-ver">
-        ${canEditProviders() ? `<button class="btn btn-xs btn-outline" title="Editar" onclick="window._pv.form('${p.id}')"><i class="fas fa-edit"></i></button>` : ''}
-      </td>
       <td><strong>${esc(p.name)}</strong></td>
       <td>${new Date(p.created_at).toLocaleDateString('es-PY')}</td>
     </tr>`);
 
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th class="col-ver no-sort"></th><th>Nombre</th><th>Fecha de registro</th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Fecha de registro</th></tr></thead>
       <tbody></tbody>
     </table>`;
     const table = el.querySelector('table');
     const lazy = lazyRenderRows(table, rowsHTML);
     enableTableSort(table, { onBeforeSort: lazy.renderAll });
     enableColumnResize(table);
-    if (canEditProviders()) enableRowClick(table, id => window._pv.form(id));
+    enableRowClick(table, id => window._pv.view(id));
   }
 
   function formHTML(p = {}) {
@@ -72,14 +69,32 @@ export async function renderProviders(container) {
         <input type="text" name="name" class="form-control" value="${esc(p.name || '')}" required autofocus>
       </div>
       <div class="form-footer">
-        ${(p.id && canDeleteProviders()) ? `<button type="button" class="btn btn-danger-outline" style="margin-right:auto" onclick="window._pv.del('${p.id}')"><i class="fas fa-trash"></i> Eliminar</button>` : ''}
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
         <button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar</button>
       </div>
     </form>`;
   }
 
+  function detailHTML(p) {
+    const row = (label, val) =>
+      `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${esc(val == null || val === '' ? '–' : String(val))}</span></div>`;
+    return `<div class="client-detail">
+      ${row('Nombre', p.name)}
+      ${row('Fecha de registro', p.created_at ? new Date(p.created_at).toLocaleDateString('es-PY') : '')}
+    </div>
+    <div class="form-footer">
+      ${canDeleteProviders() ? `<button type="button" class="btn btn-danger-outline" style="margin-right:auto" title="Eliminar" onclick="window._pv.del('${p.id}')"><i class="fas fa-trash"></i></button>` : ''}
+      <button type="button" class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
+      ${canEditProviders() ? `<button type="button" class="btn btn-accent" onclick="window._pv.form('${p.id}')"><i class="fas fa-edit"></i> Editar</button>` : ''}
+    </div>`;
+  }
+
   window._pv = {
+    async view(id) {
+      const { data } = await db.from('providers').select('*').eq('id', id).single();
+      if (!data) { toast('No se pudo cargar el proveedor', 'error'); return; }
+      openModal('Detalle del Proveedor', detailHTML(data), { size: 'sm' });
+    },
     async form(id) {
       let p = {};
       if (id) { const { data } = await db.from('providers').select('*').eq('id', id).single(); p = data || {}; }

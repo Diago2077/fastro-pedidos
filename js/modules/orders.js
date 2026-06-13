@@ -169,17 +169,16 @@ export async function renderOrders(container) {
       const tot = sub * (1 - (o.discount_pct || 0) / 100);
       return `<tr data-id="${o.id}">
         <td><strong>${esc(o.order_number)}</strong></td>
-        <td>${esc(o.clients?.name || '–')}</td>
-        <td>${esc(o.users?.name || '–')}</td>
-        <td>${esc(o.season || '–')}</td>
-        <td>${fCurrency(tot)}</td>
-        <td><button class="status-btn status-${o.status}" onclick="window._ord.changeStatus('${o.id}','${o.status}')">${STATUS_LABELS[o.status] || o.status}</button></td>
         <td>${fDate(o.created_at)}</td>
+        <td>${esc(o.clients?.name || '–')}</td>
+        <td><button class="status-btn status-${o.status}" onclick="window._ord.changeStatus('${o.id}','${o.status}')">${STATUS_LABELS[o.status] || o.status}</button></td>
+        <td>${fCurrency(tot)}</td>
+        <td>${esc(o.users?.name || '–')}</td>
       </tr>`;
     });
 
     el.innerHTML = `<table class="table table-hover">
-      <thead><tr><th>N° Pedido</th><th>Cliente</th><th>Vendedor</th><th>Temporada</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead>
+      <thead><tr><th>N° Pedido</th><th>Fecha</th><th>Cliente</th><th>Estado</th><th>Total</th><th>Vendedor</th></tr></thead>
       <tbody></tbody>
     </table>`;
     const table = el.querySelector('table');

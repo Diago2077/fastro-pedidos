@@ -49,9 +49,9 @@ export async function renderProducts(container) {
     panel:  document.getElementById('prod-filters'),
     inline: true,
     defs: [
-      { key: 'brand',    label: 'Marca' },
-      { key: 'provider', label: 'Proveedor' },
-      { key: 'season',   label: 'Temporada' }
+      { key: 'brand',    label: 'Marca',     multi: true },
+      { key: 'provider', label: 'Proveedor', multi: true },
+      { key: 'season',   label: 'Temporada', multi: true }
     ],
     onChange: applyFilters
   });

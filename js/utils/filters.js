@@ -36,37 +36,78 @@ export function createMultiFilter({ button, panel, defs, onChange, inline = fals
 
   function getSelected(key) { return [...(selected[key] || [])]; }
 
+  // A partir de esta cantidad de opciones, el dropdown multi muestra un buscador.
+  const SEARCH_MIN = 10;
+
+  // Texto resumen del trigger de un dropdown multi ("Todos" / etiqueta / "N seleccionados")
+  function multiSummary(d) {
+    const set = selected[d.key];
+    if (!set.size) return 'Todos';
+    if (set.size === 1) {
+      const v = [...set][0];
+      return options[d.key].find(o => String(o.value) === v)?.label || '1 seleccionado';
+    }
+    return `${set.size} seleccionados`;
+  }
+
+  // Lista de checkboxes (compartida por checkbox plano y dropdown multi)
+  function checkboxList(d) {
+    const sel = selected[d.key];
+    const opts = options[d.key];
+    if (!opts.length) return `<div class="filter-empty">— sin opciones —</div>`;
+    const type = d.single ? 'radio' : 'checkbox';
+    const nameAttr = d.single ? ` name="filter-${esc(d.key)}"` : '';
+    return opts.map(o => {
+      const val = String(o.value);
+      return `<label class="filter-option">
+        <input type="${type}"${nameAttr} data-key="${esc(d.key)}" value="${esc(val)}" ${sel.has(val) ? 'checked' : ''}>
+        <span>${esc(o.label)}</span>
+      </label>`;
+    }).join('');
+  }
+
   function render() {
     if (!panel) return;
     panel.innerHTML = defs.map(d => {
       const sel = selected[d.key];
       const opts = options[d.key];
-      // dropdown: <select> (un valor a la vez). single: radios. resto: checkboxes.
-      let body;
+
+      // dropdown (un valor): <select> nativo.
       if (d.dropdown) {
         const cur = [...sel][0] ?? '';
-        body = opts.length
+        const body = opts.length
           ? `<select class="form-control filter-select" data-key="${esc(d.key)}">
               ${opts.map(o => { const v = String(o.value); return `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(o.label)}</option>`; }).join('')}
             </select>`
           : `<div class="filter-empty">— sin opciones —</div>`;
-      } else {
-        const type = d.single ? 'radio' : 'checkbox';
-        const nameAttr = d.single ? ` name="filter-${esc(d.key)}"` : '';
-        body = opts.length
-          ? opts.map(o => {
-              const val = String(o.value);
-              return `<label class="filter-option">
-                <input type="${type}"${nameAttr} data-key="${esc(d.key)}" value="${esc(val)}" ${sel.has(val) ? 'checked' : ''}>
-                <span>${esc(o.label)}</span>
-              </label>`;
-            }).join('')
-          : `<div class="filter-empty">— sin opciones —</div>`;
+        return `<div class="filter-group">
+          <div class="filter-group-title">${esc(d.label)}</div>
+          <div class="filter-options">${body}</div>
+        </div>`;
       }
-      return `
-      <div class="filter-group">
-        <div class="filter-group-title">${esc(d.label)}${(!d.single && !d.dropdown && sel.size) ? ` <span class="filter-group-count">${sel.size}</span>` : ''}</div>
-        <div class="filter-options">${body}</div>
+
+      // multi: dropdown desplegable con checkboxes (+ buscador si hay muchas opciones).
+      if (d.multi) {
+        const search = opts.length >= SEARCH_MIN
+          ? `<input type="text" class="form-control filter-dd-search" data-dd-search placeholder="Buscar…">`
+          : '';
+        return `<div class="filter-dd" data-key="${esc(d.key)}">
+          <button type="button" class="form-control filter-dd-trigger" data-dd-toggle>
+            <span class="filter-dd-name">${esc(d.label)}</span>
+            <span class="filter-dd-summary">${esc(multiSummary(d))}</span>
+            <i class="fas fa-chevron-down filter-dd-caret"></i>
+          </button>
+          <div class="filter-dd-panel hidden">
+            ${search}
+            <div class="filter-options">${checkboxList(d)}</div>
+          </div>
+        </div>`;
+      }
+
+      // checkbox plano (varios valores) con contador en el título.
+      return `<div class="filter-group">
+        <div class="filter-group-title">${esc(d.label)}${sel.size ? ` <span class="filter-group-count">${sel.size}</span>` : ''}</div>
+        <div class="filter-options">${checkboxList(d)}</div>
       </div>`;
     }).join('') + `
       <div class="filter-popover-footer">
@@ -94,17 +135,41 @@ export function createMultiFilter({ button, panel, defs, onChange, inline = fals
     } else {
       const set = selected[inp.dataset.key];
       if (inp.checked) set.add(inp.value); else set.delete(inp.value);
-      // Actualizar el contador del grupo sin re-render completo
-      const title = inp.closest('.filter-group')?.querySelector('.filter-group-title');
-      if (title) {
-        const base = title.childNodes[0]?.textContent || '';
-        title.innerHTML = `${esc(base.trim())}${set.size ? ` <span class="filter-group-count">${set.size}</span>` : ''}`;
+      if (def?.multi) {
+        // Actualizar el resumen del trigger del dropdown sin re-render completo
+        const summary = panel.querySelector(`.filter-dd[data-key="${CSS.escape(def.key)}"] .filter-dd-summary`);
+        if (summary) summary.textContent = multiSummary(def);
+      } else {
+        // Actualizar el contador del grupo (checkbox plano) sin re-render completo
+        const title = inp.closest('.filter-group')?.querySelector('.filter-group-title');
+        if (title) {
+          const base = title.childNodes[0]?.textContent || '';
+          title.innerHTML = `${esc(base.trim())}${set.size ? ` <span class="filter-group-count">${set.size}</span>` : ''}`;
+        }
       }
     }
     onChange?.();
   });
 
+  // Buscador dentro de un dropdown multi: filtra las opciones visibles.
+  panel?.addEventListener('input', e => {
+    const search = e.target.closest('[data-dd-search]');
+    if (!search) return;
+    const q = search.value.toLowerCase();
+    search.closest('.filter-dd-panel')?.querySelectorAll('.filter-option').forEach(opt => {
+      opt.style.display = opt.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+
   panel?.addEventListener('click', e => {
+    // Abrir / cerrar el dropdown multi
+    const toggle = e.target.closest('[data-dd-toggle]');
+    if (toggle) {
+      const group = toggle.closest('.filter-dd');
+      group?.classList.toggle('open');
+      group?.querySelector('.filter-dd-panel')?.classList.toggle('hidden');
+      return;
+    }
     if (e.target.closest('[data-filter-clear]')) {
       // Las defs `single`/`dropdown` vuelven a su valor por defecto; las demás se vacían.
       defs.forEach(d => { selected[d.key] = ((d.single || d.dropdown) && d.default != null) ? new Set([String(d.default)]) : new Set(); });

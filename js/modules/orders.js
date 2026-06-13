@@ -88,9 +88,8 @@ export async function renderOrders(container) {
   // Filtro multi-selección (popover). El Estado es single-select (un estado a la
   // vez) y arranca en "Abierto": la tabla muestra solo los pedidos de ese estado.
   const _filterDefs = [{ key: 'status', label: 'Estado', dropdown: true, default: 'open' }];
-  _filterDefs.push({ key: 'client', label: 'Cliente' });
-  if (isAdmin()) _filterDefs.push({ key: 'seller', label: 'Vendedor' });
-  _filterDefs.push({ key: 'season', label: 'Temporada' });
+  if (isAdmin()) _filterDefs.push({ key: 'seller', label: 'Vendedor', multi: true });
+  _filterDefs.push({ key: 'season', label: 'Temporada', multi: true });
 
   const _filter = createMultiFilter({
     panel:  document.getElementById('ord-filters'),
@@ -99,7 +98,6 @@ export async function renderOrders(container) {
     onChange: applyFilters
   });
   const _getters = {
-    client: o => o.clients?.id || '',
     seller: o => o.users?.id || '',
     season: o => o.season || '',
     status: o => o.status || ''
@@ -130,13 +128,11 @@ export async function renderOrders(container) {
 
   // Rellena el filtro con los valores presentes (cliente/vendedor/temporada/estado)
   function populateFilters() {
-    const clients = new Map(), sellers = new Map(), seasons = new Set();
+    const sellers = new Map(), seasons = new Set();
     _allOrders.forEach(o => {
-      if (o.clients?.id) clients.set(o.clients.id, o.clients.name);
-      if (o.users?.id)   sellers.set(o.users.id, o.users.name);
-      if (o.season)      seasons.add(o.season);
+      if (o.users?.id) sellers.set(o.users.id, o.users.name);
+      if (o.season)    seasons.add(o.season);
     });
-    _filter.setOptions('client', [...clients.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])).map(([v, l]) => ({ value: v, label: l })));
     if (isAdmin()) _filter.setOptions('seller', [...sellers.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])).map(([v, l]) => ({ value: v, label: l })));
     _filter.setOptions('season', [...seasons].sort().map(s => ({ value: s, label: s })));
     _filter.setOptions('status', [

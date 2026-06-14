@@ -1204,6 +1204,26 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
 .qty-btn:hover  { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
 .qty-btn:active { transform: scale(.92); }
 
+/* Resumen de ítems (junto al título de la sección) */
+.items-summary {
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 6px;
+}
+
+/* Observación + Totales en dos columnas */
+.order-summary-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-top: 16px;
+}
+.order-summary-obs { flex: 1 1 auto; margin: 0; }
+.order-summary-obs textarea { min-height: 86px; resize: vertical; }
+.order-summary-row .order-totals { flex: 0 0 340px; margin-top: 0; }
+
 /* Totals */
 .order-totals {
   margin-top: 16px;
@@ -1588,8 +1608,10 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
   /* Acciones de tabla cómodas para el dedo */
   .td-actions .btn + .btn { margin-left: 6px; }
 
-  /* Totales del pedido ocupan todo el ancho */
+  /* Totales del pedido ocupan todo el ancho; Observación + Totales se apilan */
   .order-totals { max-width: none; }
+  .order-summary-row { flex-direction: column; }
+  .order-summary-row .order-totals { flex: none; width: 100%; }
 
   /* Tabs de reportes scrollean si no entran */
   .tabs-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }

@@ -488,8 +488,6 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
   <form id="order-form">
     <!-- HEADER -->
     <div class="order-header-grid">
-      ${orderId ? `<div class="form-group"><label class="form-label">N° Pedido</label>
-        <input class="form-control" value="${esc(order.order_number || '')}" readonly></div>` : ''}
       <div class="form-group" id="client-search-wrap" style="position:relative">
         <label class="form-label req">Cliente</label>
         <input type="hidden" name="client_id" id="client-id-val" value="${order.client_id || ''}">
@@ -540,20 +538,20 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
     <div id="product-grid-wrap"></div>
 
     <!-- ORDER ITEMS TABLE -->
-    <div class="section-divider"><i class="fas fa-list"></i> Ítems del Pedido</div>
+    <div class="section-divider"><i class="fas fa-list"></i> Ítems del Pedido <span id="items-summary" class="items-summary"></span></div>
     <div class="table-responsive" id="items-tbl"></div>
 
-    <!-- TOTALS -->
-    <div class="order-totals">
-      <div class="totals-row"><span>Subtotal</span><span id="tot-sub">$0.00</span></div>
-      <div class="totals-row"><span>Descuento (<span id="tot-disc-pct">0</span>%)</span><span id="tot-disc">-$0.00</span></div>
-      <div class="totals-row totals-final"><span>TOTAL</span><span id="tot-final">$0.00</span></div>
-    </div>
-
-    <!-- OBSERVACIÓN -->
-    <div class="form-group mt-3">
-      <label class="form-label">Observación</label>
-      <textarea name="observation" class="form-control" rows="2">${esc(order.observation || '')}</textarea>
+    <!-- OBSERVACIÓN + TOTALES (2 columnas) -->
+    <div class="order-summary-row">
+      <div class="form-group order-summary-obs">
+        <label class="form-label">Observación</label>
+        <textarea name="observation" class="form-control" rows="3">${esc(order.observation || '')}</textarea>
+      </div>
+      <div class="order-totals">
+        <div class="totals-row"><span>Subtotal</span><span id="tot-sub">$0.00</span></div>
+        <div class="totals-row"><span>Descuento (<span id="tot-disc-pct">0</span>%)</span><span id="tot-disc">-$0.00</span></div>
+        <div class="totals-row totals-final"><span>TOTAL</span><span id="tot-final">$0.00</span></div>
+      </div>
     </div>
 
     <!-- FOOTER -->
@@ -698,6 +696,12 @@ function showProductGrid(product) {
 function renderItemsTable() {
   const el = document.getElementById('items-tbl');
   if (!el) return;
+  // Resumen: cantidad de ítems y unidades totales
+  const sumEl = document.getElementById('items-summary');
+  if (sumEl) {
+    const units = _state.items.reduce((a, i) => a + i.qty, 0);
+    sumEl.textContent = _state.items.length ? `· ${_state.items.length} ítems · ${units} u.` : '';
+  }
   if (!_state.items.length) { el.innerHTML = emptyState('No hay productos en este pedido'); return; }
   el.innerHTML = `<table class="table table-sm table-bordered">
     <thead><tr><th>Código</th><th>Descripción</th><th>Color</th><th>Talla</th><th>Cant.</th><th>P.Venta</th><th>Subtotal</th><th></th></tr></thead>
@@ -708,8 +712,12 @@ function renderItemsTable() {
         <td>${esc(item.color)}</td>
         <td>${esc(item.size)}</td>
         <td>
-          <input type="number" min="1" value="${item.qty}" class="form-control form-control-sm text-center"
-            style="width:70px" onchange="window._ord.updateQty(${idx}, this.value)">
+          <div class="qty-stepper">
+            <button type="button" class="qty-btn" tabindex="-1" onclick="window._ord.stepQty(${idx}, -1)">−</button>
+            <input type="number" min="1" value="${item.qty}" class="form-control form-control-sm grid-qty text-center"
+              onchange="window._ord.updateQty(${idx}, this.value)">
+            <button type="button" class="qty-btn" tabindex="-1" onclick="window._ord.stepQty(${idx}, 1)">+</button>
+          </div>
         </td>
         <td>${fCurrency(item.salePrice)}</td>
         <td>${fCurrency(item.qty * item.salePrice)}</td>
@@ -741,6 +749,9 @@ window._ord = window._ord || {};
 Object.assign(window._ord, {
   updateQty(idx, val) {
     if (_state.items[idx]) { _state.items[idx].qty = Math.max(1, parseInt(val) || 1); orderChanged(); renderItemsTable(); updateTotals(); }
+  },
+  stepQty(idx, delta) {
+    if (_state.items[idx]) { _state.items[idx].qty = Math.max(1, (parseInt(_state.items[idx].qty) || 1) + delta); orderChanged(); renderItemsTable(); updateTotals(); }
   },
   removeItem(idx) { _state.items.splice(idx, 1); orderChanged(); renderItemsTable(); updateTotals(); }
 });

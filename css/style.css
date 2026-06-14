@@ -1219,7 +1219,8 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   width: 100%;
-  max-width: 640px;
+  max-width: 620px;
+  height: calc(100vh - 48px);
   max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;

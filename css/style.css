@@ -1231,7 +1231,7 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
   bottom: 0;
   z-index: 2;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px 22px;
@@ -1246,6 +1246,14 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
 .otb-cell strong { color: var(--text); font-weight: 700; }
 .otb-total { font-size: 1.05em; }
 .otb-total strong { color: var(--accent); }
+
+/* Campo Descuento dentro de la barra de totales (a la izquierda) */
+.otb-discount { display: flex; align-items: center; gap: 8px; margin-right: auto; }
+.otb-discount .form-label { margin: 0; white-space: nowrap; font-size: .85em; }
+.otb-discount input { width: 96px; min-height: 38px; padding: 6px 10px; font-size: .95em; }
+
+/* Botón Estado cuando vive en el pie del modal: ancho según contenido */
+.form-footer .status-control { width: auto; min-width: 158px; }
 
 /* Estado del pedido: control evidente (no una barra) */
 .status-control {

@@ -516,20 +516,9 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
         <label class="form-label">Temporada</label>
         <input type="text" name="season" class="form-control" value="${esc(order.season || '')}">
       </div>
-      <div class="form-group">
-        <label class="form-label">Descuento (%)</label>
-        <input type="number" name="discount_pct" class="form-control" min="0" max="100" step="0.1"
-          value="${order.discount_pct || 0}" id="discount-input">
-      </div>
-      <input type="hidden" name="shipping_date" id="order-shipping-date-val" value="${order.shipping_date || ''}">
-      <input type="hidden" name="status" id="order-status-val" value="${order.status || 'open'}">
-      <div class="form-group">
-        <label class="form-label">Estado</label>
-        <button type="button" id="order-status-btn" class="${statusBtnClass(order.status || 'open')}">
-          ${statusBtnInner(order.status || 'open')}
-        </button>
-      </div>
     </div>
+    <input type="hidden" name="shipping_date" id="order-shipping-date-val" value="${order.shipping_date || ''}">
+    <input type="hidden" name="status" id="order-status-val" value="${order.status || 'open'}">
 
     <!-- PRODUCT SEARCH -->
     <div class="section-divider"><i class="fas fa-search"></i> Agregar Productos</div>
@@ -556,6 +545,11 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
 
     <!-- TOTALES (barra fija al pie del modal) -->
     <div class="order-totals-bar">
+      <div class="otb-discount">
+        <label class="form-label" for="discount-input">Descuento (%)</label>
+        <input type="number" name="discount_pct" class="form-control" min="0" max="100" step="0.1"
+          value="${order.discount_pct || 0}" id="discount-input">
+      </div>
       <span class="otb-cell">Subtotal <strong id="tot-sub">$0.00</strong></span>
       <span class="otb-cell">Descuento (<span id="tot-disc-pct">0</span>%) <strong id="tot-disc">-$0.00</strong></span>
       <span class="otb-cell otb-total">TOTAL <strong id="tot-final">$0.00</strong></span>
@@ -566,7 +560,10 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
       ${(orderId && canDeleteOrders()) ? `<button type="button" class="btn btn-danger-outline" title="Eliminar" onclick="window._ord.del('${orderId}')"><i class="fas fa-trash"></i></button>` : ''}
       <button type="button" class="btn btn-outline" id="btn-print-order" title="Imprimir / PDF"><i class="fas fa-file-pdf"></i></button>
       ${canExportExcel() ? `<button type="button" class="btn btn-outline" id="btn-excel-order" title="Exportar Excel"><i class="fas fa-file-excel"></i></button>` : ''}
-      <button type="button" class="btn btn-secondary" style="margin-left:auto" onclick="closeModal()">Cancelar</button>
+      <button type="button" id="order-status-btn" class="${statusBtnClass(order.status || 'open')}" style="margin-left:auto">
+        ${statusBtnInner(order.status || 'open')}
+      </button>
+      <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
       ${(orderId ? canEditOrders() : canCreateOrders()) ? `<button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar</button>` : ''}
     </div>
   </form>`;

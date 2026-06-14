@@ -16,6 +16,13 @@ const STATUS_LABELS = { open: 'Abierto', sent: 'Enviado', closed: 'Cerrado' };
 function nextStatus(s) { return { open: 'closed', closed: 'sent', sent: 'open' }[s] || 'open'; }
 function todayISO() { return new Date().toISOString().split('T')[0]; }
 
+// Contenido del botón de Estado del pedido (control con pista "Cambiar")
+function statusBtnInner(s) {
+  return `<span class="status-control-label">${STATUS_LABELS[s] || s}</span>
+    <span class="status-control-hint"><i class="fas fa-sync-alt"></i> Cambiar</span>`;
+}
+function statusBtnClass(s) { return `status-btn status-control status-${s}`; }
+
 // ---- Borrador automático de pedido NUEVO (localStorage) ----
 // Sobrevive a cierres de pestaña, recargas o caídas para no perder el pedido.
 const DRAFT_KEY = 'fastro_order_draft';
@@ -296,7 +303,7 @@ async function openOrderModal(orderId, onSavedFn) {
     if (g('order-status-val'))        g('order-status-val').value        = d.status || 'open';
     const obsEl = document.querySelector('#order-form [name=observation]'); if (obsEl) obsEl.value = d.observation || '';
     const sbtn = g('order-status-btn');
-    if (sbtn) { const s = d.status || 'open'; sbtn.className = `status-btn status-${s}`; sbtn.innerHTML = `${STATUS_LABELS[s]} <i class="fas fa-sync-alt fa-xs" style="margin-left:5px;opacity:.5"></i>`; }
+    if (sbtn) { const s = d.status || 'open'; sbtn.className = statusBtnClass(s); sbtn.innerHTML = statusBtnInner(s); }
     _state.items = Array.isArray(d.items) ? d.items : [];
     _state.dirty = true;
     _prevProvider = d.provider_id || '';
@@ -434,8 +441,8 @@ async function openOrderModal(orderId, onSavedFn) {
     if (!await confirm2(`¿Cambiar estado a "${STATUS_LABELS[next]}"?`)) return;
     document.getElementById('order-status-val').value = next;
     const btn = document.getElementById('order-status-btn');
-    btn.className = `status-btn status-${next}`;
-    btn.innerHTML = `${STATUS_LABELS[next]} <i class="fas fa-sync-alt fa-xs" style="margin-left:5px;opacity:.5"></i>`;
+    btn.className = statusBtnClass(next);
+    btn.innerHTML = statusBtnInner(next);
     if (next === 'sent') document.getElementById('order-shipping-date-val').value = todayISO();
   });
 
@@ -518,8 +525,8 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
       <input type="hidden" name="status" id="order-status-val" value="${order.status || 'open'}">
       <div class="form-group">
         <label class="form-label">Estado</label>
-        <button type="button" id="order-status-btn" class="status-btn status-${order.status || 'open'}">
-          ${STATUS_LABELS[order.status || 'open']} <i class="fas fa-sync-alt fa-xs" style="margin-left:5px;opacity:.5"></i>
+        <button type="button" id="order-status-btn" class="${statusBtnClass(order.status || 'open')}">
+          ${statusBtnInner(order.status || 'open')}
         </button>
       </div>
     </div>
@@ -541,17 +548,17 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
     <div class="section-divider"><i class="fas fa-list"></i> Ítems del Pedido <span id="items-summary" class="items-summary"></span></div>
     <div class="table-responsive" id="items-tbl"></div>
 
-    <!-- OBSERVACIÓN + TOTALES (2 columnas) -->
-    <div class="order-summary-row">
-      <div class="form-group order-summary-obs">
-        <label class="form-label">Observación</label>
-        <textarea name="observation" class="form-control" rows="3">${esc(order.observation || '')}</textarea>
-      </div>
-      <div class="order-totals">
-        <div class="totals-row"><span>Subtotal</span><span id="tot-sub">$0.00</span></div>
-        <div class="totals-row"><span>Descuento (<span id="tot-disc-pct">0</span>%)</span><span id="tot-disc">-$0.00</span></div>
-        <div class="totals-row totals-final"><span>TOTAL</span><span id="tot-final">$0.00</span></div>
-      </div>
+    <!-- OBSERVACIÓN -->
+    <div class="form-group mt-3">
+      <label class="form-label">Observación</label>
+      <textarea name="observation" class="form-control" rows="2">${esc(order.observation || '')}</textarea>
+    </div>
+
+    <!-- TOTALES (barra fija al pie del modal) -->
+    <div class="order-totals-bar">
+      <span class="otb-cell">Subtotal <strong id="tot-sub">$0.00</strong></span>
+      <span class="otb-cell">Descuento (<span id="tot-disc-pct">0</span>%) <strong id="tot-disc">-$0.00</strong></span>
+      <span class="otb-cell otb-total">TOTAL <strong id="tot-final">$0.00</strong></span>
     </div>
 
     <!-- FOOTER -->
@@ -704,7 +711,7 @@ function renderItemsTable() {
   }
   if (!_state.items.length) { el.innerHTML = emptyState('No hay productos en este pedido'); return; }
   el.innerHTML = `<table class="table table-sm table-bordered">
-    <thead><tr><th>Código</th><th>Descripción</th><th>Color</th><th>Talla</th><th>Cant.</th><th>P.Venta</th><th>Subtotal</th><th></th></tr></thead>
+    <thead><tr><th>Código</th><th>Descripción</th><th>Color</th><th>Talla</th><th>Cant.</th><th class="text-end">P.Venta</th><th class="text-end">Subtotal</th><th></th></tr></thead>
     <tbody>
       ${_state.items.map((item, idx) => `<tr>
         <td>${esc(item.code)}</td>
@@ -719,8 +726,8 @@ function renderItemsTable() {
             <button type="button" class="qty-btn" tabindex="-1" onclick="window._ord.stepQty(${idx}, 1)">+</button>
           </div>
         </td>
-        <td>${fCurrency(item.salePrice)}</td>
-        <td>${fCurrency(item.qty * item.salePrice)}</td>
+        <td class="text-end">${fCurrency(item.salePrice)}</td>
+        <td class="text-end">${fCurrency(item.qty * item.salePrice)}</td>
         <td><button type="button" class="btn btn-xs btn-danger-outline" onclick="window._ord.removeItem(${idx})"><i class="fas fa-times"></i></button></td>
       </tr>`).join('')}
     </tbody>

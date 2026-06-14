@@ -1219,8 +1219,7 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   width: 100%;
-  max-width: 620px;
-  height: calc(100vh - 48px);
+  max-width: 1100px;
   max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
@@ -1243,7 +1242,7 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
 }
 .prod-picker-header .icon-btn { color: var(--text-muted); min-width: 40px; min-height: 40px; }
 .prod-picker-header .icon-btn:hover { background: var(--bg); color: var(--text); }
-.prod-picker-body { padding: 16px 18px; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; }
+.prod-picker-body { padding: 16px 18px; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; min-height: 340px; }
 
 @media (max-width: 640px) {
   .prod-picker { padding: 0; align-items: stretch; }

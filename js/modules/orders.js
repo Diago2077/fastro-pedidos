@@ -732,7 +732,20 @@ function renderItemsTable() {
       </tr>`).join('')}
     </tbody>
   </table>`;
-  enableColumnResize(el.querySelector('table'));
+  const table = el.querySelector('table');
+  enableColumnResize(table);
+
+  // Mostrar como máximo 5 filas; el resto se ve con scroll. Medimos el alto real
+  // (encabezado + 5 filas) para que el corte sea exacto aunque las filas varíen.
+  const MAX_VISIBLE = 5;
+  const bodyRows = table.tBodies[0]?.rows || [];
+  if (bodyRows.length > MAX_VISIBLE) {
+    let h = table.tHead ? table.tHead.offsetHeight : 0;
+    for (let i = 0; i < MAX_VISIBLE; i++) h += bodyRows[i].offsetHeight;
+    el.style.maxHeight = (h + 2) + 'px';
+  } else {
+    el.style.maxHeight = 'none';
+  }
 }
 
 function updateTotals() {

@@ -759,6 +759,28 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
 }
 .search-box i { position: absolute; left: 12px; color: var(--text-muted); font-size: .9em; pointer-events: none; z-index: 1; }
 .search-box .form-control { padding-left: 36px; width: 100%; }
+/* Botón "X" para limpiar el buscador (aparece cuando hay texto) */
+.search-box .search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .85em;
+  z-index: 2;
+  -webkit-tap-highlight-color: transparent;
+}
+.search-box .search-clear:hover { background: var(--bg); color: var(--text); }
+.search-box:has(.search-clear:not(.hidden)) .form-control { padding-right: 38px; }
 
 /* ============================================================
    SEARCH RESULTS DROPDOWN

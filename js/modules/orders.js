@@ -386,6 +386,18 @@ async function openOrderModal(orderId, onSavedFn) {
     searchResults._productMap = Object.fromEntries(data.map(p => [p.id, p]));
   }, 250));
 
+  // Botón "X" para limpiar la búsqueda rápido
+  const searchClear = document.getElementById('prod-search-clear');
+  const toggleSearchClear = () => searchClear?.classList.toggle('hidden', !searchInput?.value);
+  searchInput?.addEventListener('input', toggleSearchClear);
+  searchClear?.addEventListener('click', () => {
+    if (!searchInput) return;
+    searchInput.value = '';
+    searchResults?.classList.add('hidden');
+    toggleSearchClear();
+    searchInput.focus();
+  });
+
   searchResults?.addEventListener('click', e => {
     const item = e.target.closest('.sr-item[data-id]');
     if (!item) return;
@@ -394,6 +406,7 @@ async function openOrderModal(orderId, onSavedFn) {
     if (product) showProductGrid(product);
     searchInput.value = `${item.dataset.code} — ${item.dataset.desc}`;
     searchResults.classList.add('hidden');
+    toggleSearchClear();
   });
 
   // Dismiss results on outside click
@@ -452,6 +465,7 @@ async function openOrderModal(orderId, onSavedFn) {
     prodPickerBackdrop?.classList.add('hidden');
     if (searchInput) searchInput.value = '';
     searchResults?.classList.add('hidden');
+    document.getElementById('prod-search-clear')?.classList.add('hidden');
     const gw = document.getElementById('product-grid-wrap');
     if (gw) gw.innerHTML = '';
   }
@@ -595,6 +609,7 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
             <div class="search-box">
               <i class="fas fa-search"></i>
               <input type="text" id="prod-search" class="form-control" placeholder="Buscar producto por código o descripción…" autocomplete="off">
+              <button type="button" id="prod-search-clear" class="search-clear hidden" aria-label="Limpiar búsqueda"><i class="fas fa-times"></i></button>
             </div>
             <div id="prod-results" class="search-results hidden"></div>
           </div>
@@ -726,6 +741,7 @@ function showProductGrid(product) {
     const ps = document.getElementById('prod-search');
     if (ps) { ps.value = ''; ps.focus(); }
     document.getElementById('prod-results')?.classList.add('hidden');
+    document.getElementById('prod-search-clear')?.classList.add('hidden');
 
     if (added > 0 && removed > 0) toast(`${added} variante(s) actualizadas, ${removed} eliminada(s)`, 'success');
     else if (added > 0)            toast(`${added} variante(s) agregadas al pedido`, 'success');

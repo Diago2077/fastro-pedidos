@@ -166,13 +166,13 @@ a { color: inherit; text-decoration: none; }
 }
 .sidebar.sidebar-open { transform: translateX(0); }
 
+/* La X flota arriba a la derecha (sin ocupar espacio) para que el primer
+   grupo del menú arranque pegado al borde superior. */
 .sidebar-brand {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 6px 8px;
-  min-height: 0;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
 }
 
 .sidebar-close-btn {
@@ -182,7 +182,7 @@ a { color: inherit; text-decoration: none; }
 
 .sidebar-nav {
   flex: 1;
-  padding: 14px 0;
+  padding: 8px 0 14px;
   overflow-y: auto;
 }
 

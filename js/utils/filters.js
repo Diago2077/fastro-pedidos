@@ -37,7 +37,7 @@ export function createMultiFilter({ button, panel, defs, onChange, inline = fals
   function getSelected(key) { return [...(selected[key] || [])]; }
 
   // A partir de esta cantidad de opciones, el dropdown multi muestra un buscador.
-  const SEARCH_MIN = 10;
+  const SEARCH_MIN = 6;
 
   // Texto resumen del trigger de un dropdown multi ("Todos" / etiqueta / "N seleccionados")
   function multiSummary(d) {

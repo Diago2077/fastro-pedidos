@@ -4,5 +4,5 @@
 // caché en sw.js (const CACHE = 'fastro-v<misma versión>') para que el
 // service worker limpie lo viejo y los dispositivos tomen la versión nueva.
 // ============================================================
-export const APP_VERSION = '1.6.5';
+export const APP_VERSION = '1.6.6';
 export const BUILD_DATE  = '2026-06-13';

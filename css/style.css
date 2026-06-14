@@ -1174,6 +1174,89 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
 .cell-na { text-align: center; background: var(--border-light); color: var(--text-light); }
 .product-grid-table.table-sm td { padding: 5px 6px; }
 
+/* Botón "Agregar Productos" (abre el popup), debajo de la lista de ítems */
+.btn-add-products {
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px 14px;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: .92em;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background .15s ease, border-color .15s ease;
+}
+.btn-add-products:hover { background: var(--accent); color: #fff; border-style: solid; }
+.btn-add-products:active { transform: scale(.99); }
+
+/* Popup "Agregar Productos": se monta sobre el modal del pedido */
+.prod-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 520;
+}
+.prod-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 530;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+.prod-picker-dialog {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  animation: modalIn .18s ease;
+}
+.prod-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.prod-picker-header h4 {
+  font-size: .95em;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.prod-picker-header .icon-btn { color: var(--text-muted); min-width: 40px; min-height: 40px; }
+.prod-picker-header .icon-btn:hover { background: var(--bg); color: var(--text); }
+.prod-picker-body { padding: 16px 18px; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; }
+
+@media (max-width: 640px) {
+  .prod-picker { padding: 0; align-items: stretch; }
+  .prod-picker-dialog {
+    max-width: none;
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    animation: sheetIn .22s ease;
+  }
+  .prod-picker-header { position: sticky; top: 0; background: var(--surface); z-index: 2; }
+}
+
 /* Stepper de cantidad: [−] [input] [+] */
 .qty-stepper { display: flex; align-items: stretch; justify-content: center; gap: 3px; }
 .qty-stepper .grid-qty {

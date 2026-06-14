@@ -434,6 +434,31 @@ async function openOrderModal(orderId, onSavedFn) {
     syncProductSearchState();
   });
 
+  // Popup "Agregar Productos": botón abre / X y backdrop cierran
+  const prodPicker = document.getElementById('prod-picker');
+  const prodPickerBackdrop = document.getElementById('prod-picker-backdrop');
+  function openProdPicker() {
+    if (!providerSelect?.value) {
+      toast('Seleccioná un proveedor primero', 'warning');
+      providerSelect?.focus();
+      return;
+    }
+    prodPicker?.classList.remove('hidden');
+    prodPickerBackdrop?.classList.remove('hidden');
+    setTimeout(() => searchInput?.focus(), 50);
+  }
+  function closeProdPicker() {
+    prodPicker?.classList.add('hidden');
+    prodPickerBackdrop?.classList.add('hidden');
+    if (searchInput) searchInput.value = '';
+    searchResults?.classList.add('hidden');
+    const gw = document.getElementById('product-grid-wrap');
+    if (gw) gw.innerHTML = '';
+  }
+  document.getElementById('btn-open-prod-picker')?.addEventListener('click', openProdPicker);
+  document.getElementById('prod-picker-close')?.addEventListener('click', closeProdPicker);
+  prodPickerBackdrop?.addEventListener('click', closeProdPicker);
+
   // Status button — cycle with confirmation
   document.getElementById('order-status-btn')?.addEventListener('click', async () => {
     const current = document.getElementById('order-status-val').value;
@@ -520,22 +545,12 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
     <input type="hidden" name="shipping_date" id="order-shipping-date-val" value="${order.shipping_date || ''}">
     <input type="hidden" name="status" id="order-status-val" value="${order.status || 'open'}">
 
-    <!-- PRODUCT SEARCH -->
-    <div class="section-divider"><i class="fas fa-search"></i> Agregar Productos</div>
-    <div id="prod-search-wrap" style="position:relative;margin-bottom:12px">
-      <div class="search-box">
-        <i class="fas fa-search"></i>
-        <input type="text" id="prod-search" class="form-control" placeholder="Buscar producto por código o descripción…" autocomplete="off">
-      </div>
-      <div id="prod-results" class="search-results hidden"></div>
-    </div>
-
-    <!-- PRODUCT GRID (shown after selection) -->
-    <div id="product-grid-wrap"></div>
-
     <!-- ORDER ITEMS TABLE -->
     <div class="section-divider"><i class="fas fa-list"></i> Ítems del Pedido <span id="items-summary" class="items-summary"></span></div>
     <div class="table-responsive" id="items-tbl"></div>
+    <button type="button" id="btn-open-prod-picker" class="btn-add-products">
+      <i class="fas fa-plus"></i> Agregar Productos
+    </button>
 
     <!-- OBSERVACIÓN -->
     <div class="form-group mt-3">
@@ -565,6 +580,27 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
       </button>
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
       ${(orderId ? canEditOrders() : canCreateOrders()) ? `<button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar</button>` : ''}
+    </div>
+
+    <!-- POPUP: Agregar Productos (buscador + grilla de variantes) -->
+    <div id="prod-picker-backdrop" class="prod-picker-backdrop hidden"></div>
+    <div id="prod-picker" class="prod-picker hidden">
+      <div class="prod-picker-dialog">
+        <div class="prod-picker-header">
+          <h4><i class="fas fa-search"></i> Agregar Productos</h4>
+          <button type="button" class="icon-btn" id="prod-picker-close" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="prod-picker-body">
+          <div id="prod-search-wrap" style="position:relative">
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" id="prod-search" class="form-control" placeholder="Buscar producto por código o descripción…" autocomplete="off">
+            </div>
+            <div id="prod-results" class="search-results hidden"></div>
+          </div>
+          <div id="product-grid-wrap"></div>
+        </div>
+      </div>
     </div>
   </form>`;
 }
@@ -686,7 +722,10 @@ function showProductGrid(product) {
     renderItemsTable();
     updateTotals();
     wrap.innerHTML = '';
-    document.getElementById('prod-search').value = '';
+    // Limpiar la búsqueda y dejar el foco listo para el siguiente producto
+    const ps = document.getElementById('prod-search');
+    if (ps) { ps.value = ''; ps.focus(); }
+    document.getElementById('prod-results')?.classList.add('hidden');
 
     if (added > 0 && removed > 0) toast(`${added} variante(s) actualizadas, ${removed} eliminada(s)`, 'success');
     else if (added > 0)            toast(`${added} variante(s) agregadas al pedido`, 'success');

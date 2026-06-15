@@ -475,14 +475,29 @@ async function openOrderModal(orderId, onSavedFn) {
 
   // Status button — cycle with confirmation
   document.getElementById('order-status-btn')?.addEventListener('click', async () => {
-    const current = document.getElementById('order-status-val').value;
+    const statusEl = document.getElementById('order-status-val');
+    const current = statusEl.value;
     const next = nextStatus(current);
     if (!await confirm2(`¿Cambiar estado a "${STATUS_LABELS[next]}"?`)) return;
-    document.getElementById('order-status-val').value = next;
+    statusEl.value = next;
     const btn = document.getElementById('order-status-btn');
     btn.className = statusBtnClass(next);
     btn.innerHTML = statusBtnInner(next);
     if (next === 'sent') document.getElementById('order-shipping-date-val').value = todayISO();
+
+    // Pedido ya existente: el estado se guarda al instante (control aparte, con su
+    // propia confirmación) para que no se pierda al salir sin guardar el resto.
+    // Pedido nuevo: el estado queda en el formulario y se guarda al tocar "Guardar".
+    if (orderId) {
+      btn.disabled = true;
+      const payload = { status: next, updated_at: new Date().toISOString() };
+      if (next === 'sent') payload.shipping_date = todayISO();
+      const { error } = await db.from('orders').update(payload).eq('id', orderId);
+      btn.disabled = false;
+      if (error) { toast('No se pudo guardar el estado: ' + error.message, 'error'); return; }
+      toast(`Estado cambiado a "${STATUS_LABELS[next]}"`, 'success');
+      if (onSavedFn) onSavedFn(); // refrescar la lista de fondo
+    }
   });
 
   // Form submit
@@ -491,12 +506,23 @@ async function openOrderModal(orderId, onSavedFn) {
     saveOrder(order, orderId, onSavedFn);
   });
 
+  // Si hay cambios sin guardar, los guarda antes de exportar (el PDF/Excel se arma
+  // desde la BD). Devuelve false si el guardado falla, para abortar la exportación.
+  async function ensureSavedBeforeExport() {
+    if (!_state.dirty) return true;
+    const saved = await saveOrder(order, orderId, onSavedFn, { keepOpen: true });
+    return !!saved;
+  }
+
   // Print PDF
   document.getElementById('btn-print-order')?.addEventListener('click', async () => {
     if (!orderId) { toast('Guarda el pedido primero para imprimir', 'warning'); return; }
     const btn = document.getElementById('btn-print-order');
     setLoading(btn, true);
-    try { await exportOrderPDF(orderId); }
+    try {
+      if (!await ensureSavedBeforeExport()) return;
+      await exportOrderPDF(orderId);
+    }
     catch (e) { toast('Error al generar PDF: ' + e.message, 'error'); }
     finally { setLoading(btn, false); }
   });
@@ -506,7 +532,10 @@ async function openOrderModal(orderId, onSavedFn) {
     if (!orderId) { toast('Guarda el pedido primero para exportar', 'warning'); return; }
     const btn = document.getElementById('btn-excel-order');
     setLoading(btn, true);
-    try { await exportOrderExcel(orderId); }
+    try {
+      if (!await ensureSavedBeforeExport()) return;
+      await exportOrderExcel(orderId);
+    }
     catch (e) { toast('Error al exportar: ' + e.message, 'error'); }
     finally { setLoading(btn, false); }
   });
@@ -831,7 +860,9 @@ Object.assign(window._ord, {
 // ============================================================
 // SAVE ORDER
 // ============================================================
-async function saveOrder(originalOrder, orderId, onSavedFn) {
+// keepOpen=true: guarda sin cerrar el modal (usado por el auto-guardado antes de
+// exportar PDF/Excel). Devuelve el id del pedido si guardó bien, o null si falló.
+async function saveOrder(originalOrder, orderId, onSavedFn, { keepOpen = false } = {}) {
   const form = document.getElementById('order-form');
   const btn  = form.querySelector('[type=submit]');
   setLoading(btn, true);
@@ -843,21 +874,21 @@ async function saveOrder(originalOrder, orderId, onSavedFn) {
     setLoading(btn, false);
     toast('Seleccioná un cliente de la lista', 'warning');
     document.getElementById('client-search')?.focus();
-    return;
+    return null;
   }
 
   if (!fd.get('provider_id')) {
     setLoading(btn, false);
     toast('Seleccioná un proveedor', 'warning');
     document.getElementById('order-provider')?.focus();
-    return;
+    return null;
   }
 
   if (!_state.items.length) {
     setLoading(btn, false);
     toast('Agregá al menos un producto al pedido', 'warning');
     document.getElementById('prod-search')?.focus();
-    return;
+    return null;
   }
 
   const payload = {
@@ -901,12 +932,18 @@ async function saveOrder(originalOrder, orderId, onSavedFn) {
       if (error) throw error;
     }
 
-    toast(orderId ? 'Pedido actualizado' : 'Pedido creado');
     _state.dirty = false;
-    closeModal(true);   // forzar: ya se guardó, no preguntar
     if (onSavedFn) onSavedFn();
+    if (keepOpen) {
+      toast('Pedido guardado');     // auto-guardado antes de exportar: el modal sigue abierto
+    } else {
+      toast(orderId ? 'Pedido actualizado' : 'Pedido creado');
+      closeModal(true);   // forzar: ya se guardó, no preguntar
+    }
+    return finalOrderId;
   } catch (err) {
     toast('Error: ' + err.message, 'error');
+    return null;
   } finally {
     setLoading(btn, false);
   }

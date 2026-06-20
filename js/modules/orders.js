@@ -1058,6 +1058,7 @@ export async function exportOrderPDF(orderId) {
       ['', '', '', '', '', 'TOTAL',                         fGs(total)]
     ],
     footStyles: { fontStyle: 'bold' },
+    showFoot: 'lastPage',   // los totales se muestran una sola vez, al final
     styles: { fontSize: 8 }
   });
 

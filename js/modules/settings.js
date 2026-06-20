@@ -5,13 +5,19 @@ import { setSizeOrderCache } from '../utils/sizes.js';
 export async function renderSettings(container) {
   container.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin fa-2x"></i></div>`;
 
-  const [{ data: cfgData, error }, allSizes] = await Promise.all([
+  const [{ data: cfgData, error }, allSizes, { data: usersData }] = await Promise.all([
     db.from('app_config').select('*'),
-    fetchAllSizes()
+    fetchAllSizes(),
+    db.from('profiles').select('id, name, email').eq('active', true).order('name')
   ]);
   if (error) { toast('Error al cargar configuración', 'error'); return; }
 
   const cfg = Object.fromEntries((cfgData || []).map(r => [r.key, r.value]));
+
+  // Reportes por correo: usuarios con email + destinatarios ya elegidos
+  const reportUsers = (usersData || []).filter(u => u.email);
+  const reportRecipients = (() => { try { return JSON.parse(cfg.report_recipients || '[]'); } catch { return []; } })();
+  const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
   // Orden de tallas: el guardado primero (solo los que aún existen), luego las tallas nuevas
   const savedOrder = parseOrder(cfg.size_order);
@@ -53,6 +59,46 @@ export async function renderSettings(container) {
           <div id="size-order-list" class="size-order-list"></div>
           <div class="form-footer">
             <button type="button" class="btn btn-accent" id="btn-save-size-order"><i class="fas fa-save"></i> Guardar Orden</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h5 class="card-title"><i class="fas fa-envelope"></i> Reportes por correo</h5></div>
+        <div class="card-body">
+          <p class="form-hint" style="margin-bottom:12px">
+            Resumen de ventas (Ventas Totales y Total en Costo globales + pedidos de los últimos 7 días
+            por vendedor) enviado por correo a los usuarios elegidos.
+          </p>
+
+          <label class="form-label">Destinatarios</label>
+          <div id="report-recipients" class="report-recipients">
+            ${reportUsers.length ? reportUsers.map(u => `
+              <label class="report-recipient">
+                <input type="checkbox" value="${esc(u.id)}" ${reportRecipients.includes(u.id) ? 'checked' : ''}>
+                <span class="report-recipient-info">${esc(u.name)} <small>${esc(u.email)}</small></span>
+              </label>`).join('') : '<p class="text-muted" style="padding:6px 0">No hay usuarios con correo cargado.</p>'}
+          </div>
+
+          <label class="form-label" style="margin-top:14px">Envío automático</label>
+          <label class="report-sched-row">
+            <input type="checkbox" id="rep-weekly" ${cfg.report_weekly_enabled === 'true' ? 'checked' : ''}>
+            <span>Semanal, los</span>
+            <select id="rep-weekly-day" class="form-control form-control-sm report-sched-select">
+              ${WEEKDAYS.map((d, i) => `<option value="${i + 1}" ${String(cfg.report_weekly_weekday || '1') === String(i + 1) ? 'selected' : ''}>${d}</option>`).join('')}
+            </select>
+          </label>
+          <label class="report-sched-row">
+            <input type="checkbox" id="rep-monthly" ${cfg.report_monthly_enabled === 'true' ? 'checked' : ''}>
+            <span>Mensual, el</span>
+            <select id="rep-monthly-day" class="form-control form-control-sm report-sched-select">
+              ${Array.from({ length: 28 }, (_, i) => i + 1).map(d => `<option value="${d}" ${String(cfg.report_monthly_day || '1') === String(d) ? 'selected' : ''}>día ${d}</option>`).join('')}
+            </select>
+          </label>
+
+          <div class="form-footer" style="gap:8px">
+            <button type="button" class="btn btn-outline" id="btn-send-report-now"><i class="fas fa-paper-plane"></i> Enviar ahora</button>
+            <button type="button" class="btn btn-accent" id="btn-save-report-cfg"><i class="fas fa-save"></i> Guardar</button>
           </div>
         </div>
       </div>
@@ -115,6 +161,49 @@ export async function renderSettings(container) {
     if (error) { toast('Error: ' + error.message, 'error'); return; }
     setSizeOrderCache(order);   // aplicar sin recargar
     toast('Orden de tallas guardado');
+  });
+
+  // ---- Reportes por correo ----
+  const reportRecipientIds = () =>
+    [...document.querySelectorAll('#report-recipients input:checked')].map(c => c.value);
+
+  async function saveReportConfig() {
+    const now = new Date().toISOString();
+    return db.from('app_config').upsert([
+      { key: 'report_recipients',      value: JSON.stringify(reportRecipientIds()),                 updated_at: now },
+      { key: 'report_weekly_enabled',  value: String(document.getElementById('rep-weekly').checked), updated_at: now },
+      { key: 'report_weekly_weekday',  value: document.getElementById('rep-weekly-day').value,        updated_at: now },
+      { key: 'report_monthly_enabled', value: String(document.getElementById('rep-monthly').checked), updated_at: now },
+      { key: 'report_monthly_day',     value: document.getElementById('rep-monthly-day').value,       updated_at: now },
+    ], { onConflict: 'key' });
+  }
+
+  document.getElementById('btn-save-report-cfg')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-save-report-cfg');
+    setLoading(btn, true);
+    const { error } = await saveReportConfig();
+    setLoading(btn, false);
+    if (error) { toast('Error: ' + error.message, 'error'); return; }
+    toast('Configuración de reportes guardada');
+  });
+
+  document.getElementById('btn-send-report-now')?.addEventListener('click', async () => {
+    const ids = reportRecipientIds();
+    if (!ids.length) { toast('Elegí al menos un destinatario', 'warning'); return; }
+    const btn = document.getElementById('btn-send-report-now');
+    setLoading(btn, true);
+    // Guardar la selección actual para que la función use estos destinatarios
+    await saveReportConfig();
+    const { data, error } = await db.functions.invoke('send-report', { body: { mode: 'manual' } });
+    setLoading(btn, false);
+    if (error) {
+      let msg = error.message;
+      try { const j = await error.context.json(); if (j?.error) msg = j.error; } catch {}
+      toast('No se pudo enviar: ' + msg, 'error');
+      return;
+    }
+    if (data?.error) { toast('No se pudo enviar: ' + data.error, 'error'); return; }
+    toast(`Reporte enviado a ${data?.sent ?? ids.length} destinatario(s)`);
   });
 
   renderList();

@@ -524,6 +524,7 @@ a { color: inherit; text-decoration: none; }
 }
 .form-control:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(155,0,0,.1); }
 .form-control:read-only { background: var(--bg); color: var(--text-muted); }
+.form-control:disabled { background: var(--bg); color: var(--text-muted); cursor: not-allowed; opacity: .75; }
 .form-control-sm { padding: 8px 10px; font-size: 16px; min-height: 40px; }
 
 textarea.form-control { resize: vertical; min-height: 70px; }
@@ -1311,6 +1312,22 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
 }
 .qty-btn:hover  { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
 .qty-btn:active { transform: scale(.92); }
+
+/* Aviso de pedido en solo lectura (Enviado / Cerrado) */
+.order-locked-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-light);
+  color: var(--text);
+  font-size: .88em;
+}
+.order-locked-note i { color: var(--accent); }
 
 /* Resumen de ítems (junto al título de la sección) */
 .items-summary {

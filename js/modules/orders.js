@@ -207,10 +207,17 @@ export async function renderOrders(container) {
     },
     async changeStatus(id, current) {
       const next = nextStatus(current);
+      // Solo el Admin puede pasar de Cerrado→Enviado y de Enviado→Abierto.
+      const adminOnly = (current === 'closed' && next === 'sent') || (current === 'sent' && next === 'open');
+      if (adminOnly && !isAdmin()) {
+        toast('Solo un administrador puede hacer este cambio de estado', 'warning');
+        return;
+      }
       if (!await confirm2(`¿Cambiar estado a "${STATUS_LABELS[next]}"?`)) return;
       const update = { status: next, updated_at: new Date().toISOString() };
       if (next === 'sent') update.shipping_date = todayISO();
-      await db.from('orders').update(update).eq('id', id);
+      const { error } = await db.from('orders').update(update).eq('id', id);
+      if (error) { toast('No se pudo cambiar el estado: ' + error.message, 'error'); return; }
       toast(`Estado: ${STATUS_LABELS[next]}`);
       load();
     }
@@ -259,6 +266,9 @@ async function openOrderModal(orderId, onSavedFn) {
       costPrice:   i.unit_cost_price
     }));
   }
+
+  // Enviado/Cerrado = solo lectura (lo usa renderItemsTable para los ítems)
+  _state.locked = order.status === 'sent' || order.status === 'closed';
 
   const html = buildOrderFormHTML(order, clients, providers, orderId);
 
@@ -474,30 +484,54 @@ async function openOrderModal(orderId, onSavedFn) {
   prodPickerBackdrop?.addEventListener('click', closeProdPicker);
 
   // Status button — cycle with confirmation
+  // Ciclo: Abierto → Cerrado → Enviado → Abierto.
   document.getElementById('order-status-btn')?.addEventListener('click', async () => {
     const statusEl = document.getElementById('order-status-val');
     const current = statusEl.value;
     const next = nextStatus(current);
+
+    // Solo el Admin puede pasar de Cerrado→Enviado y de Enviado→Abierto.
+    const adminOnly = (current === 'closed' && next === 'sent') || (current === 'sent' && next === 'open');
+    if (adminOnly && !isAdmin()) {
+      toast('Solo un administrador puede hacer este cambio de estado', 'warning');
+      return;
+    }
+
     if (!await confirm2(`¿Cambiar estado a "${STATUS_LABELS[next]}"?`)) return;
+
+    // Pedido nuevo (sin guardar aún): el estado queda en el formulario y se
+    // guarda al tocar "Guardar". No hay nada que bloquear todavía.
+    if (!orderId) {
+      statusEl.value = next;
+      const btn = document.getElementById('order-status-btn');
+      btn.className = statusBtnClass(next);
+      btn.innerHTML = statusBtnInner(next);
+      if (next === 'sent') document.getElementById('order-shipping-date-val').value = todayISO();
+      return;
+    }
+
+    // Pedido existente: dejar el nuevo estado en el form y persistirlo al instante.
     statusEl.value = next;
-    const btn = document.getElementById('order-status-btn');
-    btn.className = statusBtnClass(next);
-    btn.innerHTML = statusBtnInner(next);
     if (next === 'sent') document.getElementById('order-shipping-date-val').value = todayISO();
 
-    // Pedido ya existente: el estado se guarda al instante (control aparte, con su
-    // propia confirmación) para que no se pierda al salir sin guardar el resto.
-    // Pedido nuevo: el estado queda en el formulario y se guarda al tocar "Guardar".
-    if (orderId) {
-      btn.disabled = true;
+    let ok;
+    if (_state.dirty) {
+      // Había cambios sin guardar (pedido editable): guardar todo, incluido el estado.
+      ok = !!(await saveOrder(order, orderId, onSavedFn, { keepOpen: true }));
+    } else {
       const payload = { status: next, updated_at: new Date().toISOString() };
       if (next === 'sent') payload.shipping_date = todayISO();
       const { error } = await db.from('orders').update(payload).eq('id', orderId);
-      btn.disabled = false;
-      if (error) { toast('No se pudo guardar el estado: ' + error.message, 'error'); return; }
-      toast(`Estado cambiado a "${STATUS_LABELS[next]}"`, 'success');
-      if (onSavedFn) onSavedFn(); // refrescar la lista de fondo
+      if (error) { toast('No se pudo guardar el estado: ' + error.message, 'error'); statusEl.value = current; return; }
+      if (onSavedFn) onSavedFn();
+      ok = true;
     }
+    if (!ok) { statusEl.value = current; return; }
+
+    toast(`Estado cambiado a "${STATUS_LABELS[next]}"`, 'success');
+    // Re-abrir el pedido para reflejar el bloqueo/desbloqueo de la edición.
+    window.removeEventListener('beforeunload', beforeUnload);
+    window._ord.open(orderId);
   });
 
   // Form submit
@@ -559,8 +593,18 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
   const providerOpts = providers.map(p => `<option value="${p.id}" ${order.provider_id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
   const selectedClient = clients.find(c => c.id === order.client_id);
 
+  // Pedido Enviado o Cerrado = solo lectura. Para editar hay que volverlo a Abierto.
+  const locked = order.status === 'sent' || order.status === 'closed';
+  const dis = locked ? 'disabled' : '';
+  const lockNote = locked ? `
+    <div class="order-locked-note">
+      <i class="fas fa-lock"></i>
+      Pedido <strong>${STATUS_LABELS[order.status]}</strong>: solo lectura. Cambiá el estado a <strong>Abierto</strong> para editar.
+    </div>` : '';
+
   return `
   <form id="order-form">
+    ${lockNote}
     <!-- HEADER -->
     <div class="order-header-grid">
       <div class="form-group" id="client-search-wrap" style="position:relative">
@@ -568,21 +612,21 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
         <input type="hidden" name="client_id" id="client-id-val" value="${order.client_id || ''}">
         <div class="search-box">
           <i class="fas fa-search"></i>
-          <input type="text" id="client-search" class="form-control" autocomplete="off"
+          <input type="text" id="client-search" class="form-control" autocomplete="off" ${dis}
             placeholder="Buscar por código, nombre o tienda…" value="${esc(clientLabel(selectedClient))}">
         </div>
         <div id="client-results" class="search-results hidden"></div>
       </div>
       <div class="form-group">
         <label class="form-label req">Proveedor</label>
-        <select name="provider_id" id="order-provider" class="form-control" required>
+        <select name="provider_id" id="order-provider" class="form-control" required ${dis}>
           <option value="">— Seleccionar —</option>
           ${providerOpts}
         </select>
       </div>
       <div class="form-group">
         <label class="form-label">Temporada</label>
-        <input type="text" name="season" class="form-control" value="${esc(order.season || '')}">
+        <input type="text" name="season" class="form-control" value="${esc(order.season || '')}" ${dis}>
       </div>
     </div>
     <input type="hidden" name="shipping_date" id="order-shipping-date-val" value="${order.shipping_date || ''}">
@@ -591,14 +635,14 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
     <!-- ORDER ITEMS TABLE -->
     <div class="section-divider"><i class="fas fa-list"></i> Ítems del Pedido <span id="items-summary" class="items-summary"></span></div>
     <div class="table-responsive" id="items-tbl"></div>
-    <button type="button" id="btn-open-prod-picker" class="btn-add-products">
+    ${locked ? '' : `<button type="button" id="btn-open-prod-picker" class="btn-add-products">
       <i class="fas fa-plus"></i> Agregar Productos
-    </button>
+    </button>`}
 
     <!-- OBSERVACIÓN -->
     <div class="form-group mt-3">
       <label class="form-label">Observación</label>
-      <textarea name="observation" class="form-control" rows="2">${esc(order.observation || '')}</textarea>
+      <textarea name="observation" class="form-control" rows="2" ${dis}>${esc(order.observation || '')}</textarea>
     </div>
 
     <!-- TOTALES (barra fija al pie del modal) -->
@@ -606,7 +650,7 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
       <div class="otb-discount">
         <label class="form-label" for="discount-input">Descuento (%)</label>
         <input type="number" name="discount_pct" class="form-control" min="0" max="100" step="0.1"
-          value="${order.discount_pct || 0}" id="discount-input">
+          value="${order.discount_pct || 0}" id="discount-input" ${dis}>
       </div>
       <span class="otb-cell">Subtotal <strong id="tot-sub">$0.00</strong></span>
       <span class="otb-cell">Descuento (<span id="tot-disc-pct">0</span>%) <strong id="tot-disc">-$0.00</strong></span>
@@ -622,7 +666,7 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
         ${statusBtnInner(order.status || 'open')}
       </button>
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      ${(orderId ? canEditOrders() : canCreateOrders()) ? `<button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar</button>` : ''}
+      ${(!locked && (orderId ? canEditOrders() : canCreateOrders())) ? `<button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar</button>` : ''}
     </div>
 
     <!-- POPUP: Agregar Productos (buscador + grilla de variantes) -->
@@ -791,25 +835,26 @@ function renderItemsTable() {
     sumEl.textContent = _state.items.length ? `· ${_state.items.length} ítems · ${units} u.` : '';
   }
   if (!_state.items.length) { el.innerHTML = emptyState('No hay productos en este pedido'); return; }
+  const locked = _state.locked;
   el.innerHTML = `<table class="table table-sm table-bordered">
-    <thead><tr><th>Código</th><th>Descripción</th><th>Color</th><th>Talla</th><th>Cant.</th><th class="text-end">P.Venta</th><th class="text-end">Subtotal</th><th></th></tr></thead>
+    <thead><tr><th>Código</th><th>Descripción</th><th>Color</th><th>Talla</th><th class="text-center">Cant.</th><th class="text-end">P.Venta</th><th class="text-end">Subtotal</th><th></th></tr></thead>
     <tbody>
       ${_state.items.map((item, idx) => `<tr>
         <td>${esc(item.code)}</td>
         <td>${esc(item.description)}</td>
         <td>${esc(item.color)}</td>
         <td>${esc(item.size)}</td>
-        <td>
+        <td class="text-center">${locked ? `<strong>${item.qty}</strong>` : `
           <div class="qty-stepper">
             <button type="button" class="qty-btn" tabindex="-1" onclick="window._ord.stepQty(${idx}, -1)">−</button>
             <input type="number" min="1" value="${item.qty}" class="form-control form-control-sm grid-qty text-center"
               onchange="window._ord.updateQty(${idx}, this.value)">
             <button type="button" class="qty-btn" tabindex="-1" onclick="window._ord.stepQty(${idx}, 1)">+</button>
-          </div>
+          </div>`}
         </td>
         <td class="text-end">${fCurrency(item.salePrice)}</td>
         <td class="text-end">${fCurrency(item.qty * item.salePrice)}</td>
-        <td><button type="button" class="btn btn-xs btn-danger-outline" onclick="window._ord.removeItem(${idx})"><i class="fas fa-times"></i></button></td>
+        <td>${locked ? '' : `<button type="button" class="btn btn-xs btn-danger-outline" onclick="window._ord.removeItem(${idx})"><i class="fas fa-times"></i></button>`}</td>
       </tr>`).join('')}
     </tbody>
   </table>`;

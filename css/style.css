@@ -658,37 +658,37 @@ select.form-control { cursor: pointer; }
    altura de la pantalla. Todo el layout usa min-height (crecería con el
    contenido), así que sin esto el scroll se iría a la página entera y los
    encabezados no quedarían fijos. */
-.app-layout:has(.content-area > .card > .table-responsive) {
+.app-layout:has(.content-area > .card > .table-responsive):not(:has(.content-area > .stats-grid)) {
   height: 100dvh;
   min-height: 0;
   overflow: hidden;            /* el scroll vive dentro de la tabla */
 }
-.app-layout:has(.content-area > .card > .table-responsive) .main-wrapper {
+.app-layout:has(.content-area > .card > .table-responsive):not(:has(.content-area > .stats-grid)) .main-wrapper {
   min-height: 0;
 }
-.content-area:has(> .card > .table-responsive) {
+.content-area:has(> .card > .table-responsive):not(:has(> .stats-grid)) {
   /* flex:1 (regla base) ya le da el alto del main-wrapper, ahora acotado */
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
-.content-area:has(> .card > .table-responsive) > .card {
+.content-area:has(> .card > .table-responsive):not(:has(> .stats-grid)) > .card {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
-.content-area:has(> .card > .table-responsive) > .card > .card-header {
+.content-area:has(> .card > .table-responsive):not(:has(> .stats-grid)) > .card > .card-header {
   flex-shrink: 0;
 }
-.content-area:has(> .card > .table-responsive) > .card > .table-responsive {
+.content-area:has(> .card > .table-responsive):not(:has(> .stats-grid)) > .card > .table-responsive {
   flex: 1;
   min-height: 0;
   overflow: auto;            /* scroll vertical (y horizontal) dentro de la tabla */
 }
 /* Encabezado de columnas pegado al borde superior del scroll de la tabla */
-.content-area:has(> .card > .table-responsive) thead th {
+.content-area:has(> .card > .table-responsive):not(:has(> .stats-grid)) thead th {
   position: sticky;
   top: 0;
   z-index: 3;

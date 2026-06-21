@@ -150,6 +150,10 @@ Deno.serve(async (req) => {
     if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
       return json({ error: 'Falta configurar GMAIL_USER o GMAIL_APP_PASSWORD en los secrets' }, 500);
     }
+    // Compactar el espacio en blanco entre etiquetas: evita que la codificación
+    // quoted-printable deje artefactos visibles tipo "=20" en algunos clientes.
+    const cleanHtml = html.replace(/>\s+</g, '><').trim();
+
     const smtp = new SMTPClient({
       connection: {
         hostname: 'smtp.gmail.com',
@@ -164,7 +168,7 @@ Deno.serve(async (req) => {
         to: emails,
         subject,
         content: 'Reporte de ventas FASTRO. Abrí este correo en formato HTML para verlo.',
-        html,
+        html: cleanHtml,
       });
     } finally {
       await smtp.close();

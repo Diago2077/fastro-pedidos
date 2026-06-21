@@ -192,44 +192,58 @@ function buildHtml(
     const rows = bySeller[name].map((o: any) => {
       const tot = (revByOrder[o.id] || 0) * (1 - (o.discount_pct || 0) / 100);
       return `<tr>
-        <td style="padding:6px 10px;border-bottom:1px solid #eee"><strong>${esc(o.order_number)}</strong></td>
-        <td style="padding:6px 10px;border-bottom:1px solid #eee">${esc(o.clients?.name || '–')}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">${gs(tot)}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid #eee">${esc(STATUS_LABEL[o.status] || o.status)}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid #eee">${fDate(o.created_at)}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;white-space:nowrap"><strong>${esc(o.order_number)}</strong></td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee">${esc(o.clients?.name || '–')}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">${gs(tot)}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;white-space:nowrap">${esc(STATUS_LABEL[o.status] || o.status)}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #eee;white-space:nowrap">${fDate(o.created_at)}</td>
       </tr>`;
     }).join('');
     return `
       <h3 style="margin:22px 0 8px;font-size:15px;color:#111">${esc(name)} <span style="color:#888;font-weight:normal">(${bySeller[name].length})</span></h3>
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <table role="presentation" class="ord-table" width="100%" style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
           <tr style="background:#9B0000;color:#fff">
-            <th style="padding:6px 10px;text-align:left">N° Pedido</th>
-            <th style="padding:6px 10px;text-align:left">Cliente</th>
-            <th style="padding:6px 10px;text-align:right">Total</th>
-            <th style="padding:6px 10px;text-align:left">Estado</th>
-            <th style="padding:6px 10px;text-align:left">Fecha</th>
+            <th style="padding:8px 10px;text-align:left">N° Pedido</th>
+            <th style="padding:8px 10px;text-align:left">Cliente</th>
+            <th style="padding:8px 10px;text-align:right">Total</th>
+            <th style="padding:8px 10px;text-align:left">Estado</th>
+            <th style="padding:8px 10px;text-align:left">Fecha</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>`;
   }).join('') : `<p style="color:#666">No se crearon pedidos en los últimos 7 días.</p>`;
 
-  return `<!doctype html><html><body style="margin:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#222">
-    <div style="max-width:680px;margin:0 auto;background:#fff">
+  return `<!doctype html><html><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      @media only screen and (max-width:600px){
+        .kpi-cell{display:block!important;width:100%!important;box-sizing:border-box!important}
+        .kpi-cell.first{margin-bottom:10px!important}
+        .kpi-gap{display:none!important}
+        .ord-table{font-size:12px!important}
+        .ord-table th,.ord-table td{padding:6px 8px!important}
+        .wrap{padding:16px!important}
+      }
+    </style>
+  </head>
+  <body style="margin:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#222">
+    <div style="max-width:680px;width:100%;margin:0 auto;background:#fff">
       <div style="background:#111;color:#fff;padding:18px 24px">
         <div style="font-size:18px;font-weight:700">FASTRO S.A.</div>
         <div style="font-size:12px;opacity:.8">Reporte de ventas · ${new Date().toLocaleDateString('es-PY')}</div>
       </div>
-      <div style="padding:24px">
-        <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
+      <div class="wrap" style="padding:24px">
+        <table role="presentation" width="100%" style="width:100%;border-collapse:separate;border-spacing:0;margin-bottom:8px">
           <tr>
-            <td style="padding:14px 16px;background:#f8f8fa;border:1px solid #eee;border-radius:8px;width:50%">
+            <td class="kpi-cell first" style="padding:14px 16px;background:#f8f8fa;border:1px solid #eee;border-radius:8px;width:50%;vertical-align:top">
               <div style="font-size:12px;color:#888">Ventas Totales</div>
               <div style="font-size:20px;font-weight:700;color:#9B0000">${gs(totalRev)}</div>
             </td>
-            <td style="width:12px"></td>
-            <td style="padding:14px 16px;background:#f8f8fa;border:1px solid #eee;border-radius:8px;width:50%">
+            <td class="kpi-gap" style="width:12px"></td>
+            <td class="kpi-cell" style="padding:14px 16px;background:#f8f8fa;border:1px solid #eee;border-radius:8px;width:50%;vertical-align:top">
               <div style="font-size:12px;color:#888">Total Ventas en Costo</div>
               <div style="font-size:20px;font-weight:700;color:#111">${gs(totalCost)}</div>
             </td>

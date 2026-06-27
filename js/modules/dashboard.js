@@ -225,8 +225,9 @@ function exportDashboardPDF(d) {
   doc.text(`Generado: ${new Date().toLocaleDateString('es-PY')}`, pageW - M, 17, { align: 'right' });
 
   // --- KPIs (tabla de 2 columnas) ---
+  // En el PDF el símbolo ₲ no existe en la fuente (saldría "²"): usamos "Gs".
   const kpis = [
-    ['Ventas Totales (Gs)', fCurrency(d.totalRev)],
+    ['Ventas Totales (Gs)', fMoney(d.totalRev, 'Gs')],
     ...(d.canCost ? [['Total Ventas en Costo ($)', fMoney(d.totalCost, '$')]] : []),
     ['Pedidos Abiertos', String(d.nOpen)],
     ['Pedidos Cerrados', String(d.nClosed)],
@@ -244,27 +245,31 @@ function exportDashboardPDF(d) {
   });
 
   // --- Gráficos (lado a lado) ---
-  let y = doc.lastAutoTable.finalY + 8;
+  let y = doc.lastAutoTable.finalY + 10;
   const usableW = pageW - M * 2;
-  const gap = 6;
+  const gap = 10;
   const colW = (usableW - gap) / 2;
+  const MAX_CHART_H = 55; // alto máximo de cada gráfico (mm)
   const addChart = (canvasId, title, x) => {
     const cv = document.getElementById(canvasId);
     if (!cv || !cv.width) return 0;
     try {
       const img = cv.toDataURL('image/png', 1.0);
-      const h = colW * (cv.height / cv.width);
+      const ratio = cv.height / cv.width;
+      let w = colW, h = w * ratio;
+      if (h > MAX_CHART_H) { h = MAX_CHART_H; w = h / ratio; } // achicar manteniendo proporción
+      const cx = x + (colW - w) / 2; // centrar dentro de la columna
       doc.setTextColor(33, 33, 33);
       doc.setFontSize(9); doc.setFont('helvetica', 'bold');
       doc.text(title, x, y);
-      doc.addImage(img, 'PNG', x, y + 2, colW, h);
+      doc.addImage(img, 'PNG', cx, y + 3, w, h);
       return h;
     } catch (_) { return 0; }
   };
   const h1 = addChart('ch-sellers', d.sellerTitle, M);
   const h2 = addChart('ch-season', 'Ventas por Temporada', M + colW + gap);
   const maxH = Math.max(h1, h2);
-  if (maxH > 0) y += maxH + 12;
+  if (maxH > 0) y += maxH + 14;
 
   // --- Últimos pedidos ---
   doc.setTextColor(33, 33, 33);
@@ -274,7 +279,7 @@ function exportDashboardPDF(d) {
     startY: y + 3,
     head: [['N° Pedido', 'Cliente', 'Vendedor', 'Temporada', 'Total', 'Estado', 'Fecha']],
     body: d.recent.length
-      ? d.recent.map(o => [o.order_number, o.client, o.seller, o.season, fCurrency(o.total), o.status, o.date])
+      ? d.recent.map(o => [o.order_number, o.client, o.seller, o.season, fMoney(o.total, 'Gs'), o.status, o.date])
       : [[{ content: 'No hay pedidos aún.', colSpan: 7, styles: { halign: 'center', textColor: [120, 120, 120] } }]],
     headStyles: { fillColor: [155, 0, 0], textColor: 255, fontStyle: 'bold', fontSize: 8 },
     bodyStyles: { fontSize: 8 },

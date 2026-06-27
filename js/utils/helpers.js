@@ -110,8 +110,14 @@ export function fDateTime(d) {
   return new Date(d).toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+// Formatea un monto con el símbolo que se le pase (₲ por defecto).
+// Ventas Totales va en guaraníes (₲); Ventas en Costo, en dólares ($).
+export function fMoney(n, symbol = '₲') {
+  return symbol + ' ' + new Intl.NumberFormat('es-PY', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(n || 0));
+}
+
 export function fCurrency(n) {
-  return '₲ ' + new Intl.NumberFormat('es-PY', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(n || 0));
+  return fMoney(n, '₲');
 }
 
 export function fNum(n) {

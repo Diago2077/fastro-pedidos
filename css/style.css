@@ -1087,6 +1087,12 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
 .si-orange { background: var(--warning); }
 .si-dark   { background: #2d3748; }
 
+/* Ícono de tarjeta con texto (ej. "Gs" / "$") en vez de un icono FontAwesome */
+.stat-icon-text { font-weight: 700; font-size: 1.05em; letter-spacing: .5px; }
+
+/* Barra superior del Dashboard (botón Descargar PDF) */
+.dash-toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+
 .stat-value { font-size: 1.6em; font-weight: 700; line-height: 1.2; }
 .stat-label { font-size: .8em; color: var(--text-muted); margin-top: 2px; }
 

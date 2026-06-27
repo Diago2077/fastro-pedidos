@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { fCurrency, fDate, enableTableSort, enableColumnResize, emptyState, loadingHTML, toast } from '../utils/helpers.js';
+import { fCurrency, fMoney, fDate, enableTableSort, enableColumnResize, emptyState, loadingHTML, toast } from '../utils/helpers.js';
 import { canSeeCost } from '../auth.js';
 
 const charts = {};
@@ -12,14 +12,17 @@ export async function renderDashboard(container) {
   const _canCost = canSeeCost();
 
   container.innerHTML = `
+    <div class="dash-toolbar">
+      <button class="btn btn-sm btn-outline" id="dash-pdf" title="Descargar Dashboard en PDF"><i class="fas fa-file-pdf"></i> Descargar PDF</button>
+    </div>
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-icon si-red"><i class="fas fa-dollar-sign"></i></div>
+        <div class="stat-icon si-red stat-icon-text">Gs</div>
         <div><div class="stat-value" id="s-rev">–</div><div class="stat-label">Ventas Totales</div></div>
       </div>
       ${_canCost ? `
       <div class="stat-card">
-        <div class="stat-icon si-dark"><i class="fas fa-money-bill-wave"></i></div>
+        <div class="stat-icon si-dark stat-icon-text">$</div>
         <div><div class="stat-value" id="s-cost">–</div><div class="stat-label">Total Ventas en Costo</div></div>
       </div>` : ''}
       <div class="stat-card">
@@ -92,11 +95,15 @@ export async function renderDashboard(container) {
     totalCost += (costByOrder[o.id] || 0); // el costo no lleva descuento
   });
 
-  document.getElementById('s-rev').textContent    = fCurrency(totalRev);
-  if (_canCost) document.getElementById('s-cost').textContent = fCurrency(totalCost);
-  document.getElementById('s-open').textContent   = orders.filter(o => o.status === 'open').length;
-  document.getElementById('s-closed').textContent = orders.filter(o => o.status === 'closed').length;
-  document.getElementById('s-sent').textContent   = orders.filter(o => o.status === 'sent').length;
+  const nOpen   = orders.filter(o => o.status === 'open').length;
+  const nClosed = orders.filter(o => o.status === 'closed').length;
+  const nSent   = orders.filter(o => o.status === 'sent').length;
+
+  document.getElementById('s-rev').textContent    = fCurrency(totalRev);          // Guaraníes
+  if (_canCost) document.getElementById('s-cost').textContent = fMoney(totalCost, '$'); // Dólares
+  document.getElementById('s-open').textContent   = nOpen;
+  document.getElementById('s-closed').textContent = nClosed;
+  document.getElementById('s-sent').textContent   = nSent;
 
   // Chart: ventas por vendedor — solo la temporada actual (de Configuración)
   const titleEl = document.getElementById('ch-sellers-title');
@@ -148,13 +155,32 @@ export async function renderDashboard(container) {
   // Recent orders table
   const recent = [...orders].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 8);
   const tbl = document.getElementById('recent-tbl');
-  if (!recent.length) { tbl.innerHTML = '<p class="p-3 text-muted">No hay pedidos aún.</p>'; return; }
 
+  const STATUS_LABEL = { open: 'Abierto', closed: 'Cerrado', sent: 'Enviado' };
   const statusBadge = s => {
-    const m = { open: ['Abierto', 'info'], closed: ['Cerrado', 'warning'], sent: ['Enviado', 'success'] };
-    const [l, t] = m[s] || [s, 'secondary'];
-    return `<span class="badge badge-${t}">${l}</span>`;
+    const t = { open: 'info', closed: 'warning', sent: 'success' }[s] || 'secondary';
+    return `<span class="badge badge-${t}">${STATUS_LABEL[s] || s}</span>`;
   };
+
+  // Botón "Descargar PDF": arma un PDF con KPIs, gráficos y últimos pedidos.
+  const pdfBtn = document.getElementById('dash-pdf');
+  if (pdfBtn) pdfBtn.onclick = () => exportDashboardPDF({
+    canCost: _canCost,
+    totalRev, totalCost,
+    nOpen, nClosed, nSent,
+    sellerTitle: titleEl?.textContent || 'Ventas por Vendedor',
+    recent: recent.map(o => ({
+      order_number: o.order_number,
+      client: o.clients?.name || '–',
+      seller: o.users?.name || '–',
+      season: o.season || '–',
+      total: (revByOrder[o.id] || 0) * (1 - (o.discount_pct || 0) / 100),
+      status: STATUS_LABEL[o.status] || o.status,
+      date: fDate(o.created_at)
+    }))
+  });
+
+  if (!recent.length) { tbl.innerHTML = '<p class="p-3 text-muted">No hay pedidos aún.</p>'; return; }
 
   tbl.innerHTML = `<table class="table table-hover">
     <thead><tr><th>N° Pedido</th><th>Cliente</th><th>Vendedor</th><th>Temporada</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead>
@@ -176,4 +202,87 @@ export async function renderDashboard(container) {
   </table>`;
   enableTableSort(tbl.querySelector('table'));
   enableColumnResize(tbl.querySelector('table'));
+}
+
+// ============================================================
+// Descargar TODO el Dashboard en un PDF: KPIs + gráficos + últimos pedidos.
+// Los gráficos se toman de los <canvas> en pantalla (toDataURL).
+// ============================================================
+function exportDashboardPDF(d) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const M = 14; // margen lateral
+
+  // --- Cabecera ---
+  doc.setFillColor(17, 17, 17);
+  doc.rect(0, 0, pageW, 22, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+  doc.text('FASTRO S.A.', M, 10);
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.text('Dashboard — Resumen general', M, 17);
+  doc.text(`Generado: ${new Date().toLocaleDateString('es-PY')}`, pageW - M, 17, { align: 'right' });
+
+  // --- KPIs (tabla de 2 columnas) ---
+  const kpis = [
+    ['Ventas Totales (Gs)', fCurrency(d.totalRev)],
+    ...(d.canCost ? [['Total Ventas en Costo ($)', fMoney(d.totalCost, '$')]] : []),
+    ['Pedidos Abiertos', String(d.nOpen)],
+    ['Pedidos Cerrados', String(d.nClosed)],
+    ['Pedidos Enviados', String(d.nSent)]
+  ];
+  doc.autoTable({
+    startY: 28,
+    head: [['Indicador', 'Valor']],
+    body: kpis,
+    headStyles: { fillColor: [155, 0, 0], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+    bodyStyles: { fontSize: 9 },
+    columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+    styles: { cellPadding: 3 },
+    margin: { left: M, right: M }
+  });
+
+  // --- Gráficos (lado a lado) ---
+  let y = doc.lastAutoTable.finalY + 8;
+  const usableW = pageW - M * 2;
+  const gap = 6;
+  const colW = (usableW - gap) / 2;
+  const addChart = (canvasId, title, x) => {
+    const cv = document.getElementById(canvasId);
+    if (!cv || !cv.width) return 0;
+    try {
+      const img = cv.toDataURL('image/png', 1.0);
+      const h = colW * (cv.height / cv.width);
+      doc.setTextColor(33, 33, 33);
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+      doc.text(title, x, y);
+      doc.addImage(img, 'PNG', x, y + 2, colW, h);
+      return h;
+    } catch (_) { return 0; }
+  };
+  const h1 = addChart('ch-sellers', d.sellerTitle, M);
+  const h2 = addChart('ch-season', 'Ventas por Temporada', M + colW + gap);
+  const maxH = Math.max(h1, h2);
+  if (maxH > 0) y += maxH + 12;
+
+  // --- Últimos pedidos ---
+  doc.setTextColor(33, 33, 33);
+  doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+  doc.text('Últimos Pedidos', M, y);
+  doc.autoTable({
+    startY: y + 3,
+    head: [['N° Pedido', 'Cliente', 'Vendedor', 'Temporada', 'Total', 'Estado', 'Fecha']],
+    body: d.recent.length
+      ? d.recent.map(o => [o.order_number, o.client, o.seller, o.season, fCurrency(o.total), o.status, o.date])
+      : [[{ content: 'No hay pedidos aún.', colSpan: 7, styles: { halign: 'center', textColor: [120, 120, 120] } }]],
+    headStyles: { fillColor: [155, 0, 0], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+    bodyStyles: { fontSize: 8 },
+    alternateRowStyles: { fillColor: [248, 248, 250] },
+    columnStyles: { 4: { halign: 'right' } },
+    styles: { cellPadding: 2.5, overflow: 'linebreak' },
+    margin: { left: M, right: M }
+  });
+
+  doc.save(`dashboard-${new Date().toISOString().split('T')[0]}.pdf`);
 }

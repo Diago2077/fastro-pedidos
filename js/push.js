@@ -11,7 +11,7 @@
 import { db } from './supabase.js';
 import { getSession } from './auth.js';
 
-export const VAPID_PUBLIC_KEY = 'PEGAR_AQUI_LA_CLAVE_PUBLICA_VAPID';
+export const VAPID_PUBLIC_KEY = 'BMaqnA-g6tFg_rOCX182ReO5olqIXFrzTBAL5LEphcCBoN-ixhPP4EYPJvoZzz9iaAK8Q64DhGIKqwFr_abWfx8';
 
 // ¿El navegador soporta push? (iPhone/iPad: solo con la app instalada en
 // pantalla de inicio, iOS 16.4+).

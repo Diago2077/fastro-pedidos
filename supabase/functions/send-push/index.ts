@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const type = body?.type === 'manual' ? 'manual' : 'order_status';
+    const type = ['manual', 'broadcast'].includes(body?.type) ? body.type : 'order_status';
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
@@ -100,26 +100,32 @@ Deno.serve(async (req) => {
 
     // ---- Resolver destinatarios + payload según el tipo ----
     let recipientIds: string[] = [];
+    let toEveryone = false; // broadcast: a todos los dispositivos suscriptos
     let payload: { title: string; body: string; url: string };
 
-    if (type === 'manual') {
+    if (type === 'manual' || type === 'broadcast') {
+      // Ambos son envíos manuales de Admin.
       const { data: prof } = await admin.from('profiles').select('role').eq('id', user.id).maybeSingle();
       if (prof?.role !== 'admin') return json({ error: 'Solo un administrador puede enviar manualmente' }, 403);
 
-      const targetId = String(body?.userId || '');
-      const message  = String(body?.message || '').trim();
-      if (!targetId)  return json({ error: 'Falta el usuario destinatario' }, 400);
-      if (!message)   return json({ error: 'El mensaje está vacío' }, 400);
+      const message = String(body?.message || '').trim();
+      if (!message) return json({ error: 'El mensaje está vacío' }, 400);
 
-      recipientIds = [targetId];
+      if (type === 'broadcast') {
+        toEveryone = true;
+      } else {
+        const targetId = String(body?.userId || '');
+        if (!targetId) return json({ error: 'Falta el usuario destinatario' }, 400);
+        recipientIds = [targetId];
+      }
       payload = { title: String(body?.title || 'Mensaje'), body: message, url: '/' };
     } else {
-      // order_status: destinatarios = report_recipients, menos el actor.
+      // order_status: destinatarios = notify_recipients (propios de notificaciones), menos el actor.
       const orderId = String(body?.orderId || '');
       const status  = String(body?.status || '');
       if (!orderId) return json({ error: 'Falta el pedido' }, 400);
 
-      const { data: cfgRows } = await admin.from('app_config').select('value').eq('key', 'report_recipients').maybeSingle();
+      const { data: cfgRows } = await admin.from('app_config').select('value').eq('key', 'notify_recipients').maybeSingle();
       try { recipientIds = JSON.parse(cfgRows?.value || '[]'); } catch { recipientIds = []; }
       recipientIds = recipientIds.filter((id) => id && id !== user.id); // no avisar al actor
       if (!recipientIds.length) return json({ ok: true, sent: 0, failed: 0, note: 'sin destinatarios' });
@@ -135,11 +141,10 @@ Deno.serve(async (req) => {
       };
     }
 
-    // ---- Suscripciones de esos usuarios ----
-    const { data: subs } = await admin
-      .from('push_subscriptions')
-      .select('id, endpoint, p256dh, auth')
-      .in('user_id', recipientIds);
+    // ---- Suscripciones (de los destinatarios, o de todos si es broadcast) ----
+    let subsQuery = admin.from('push_subscriptions').select('id, endpoint, p256dh, auth');
+    if (!toEveryone) subsQuery = subsQuery.in('user_id', recipientIds);
+    const { data: subs } = await subsQuery;
     if (!subs || !subs.length) return json({ ok: true, sent: 0, failed: 0, note: 'sin dispositivos suscriptos' });
 
     // ---- Enviar a cada dispositivo ----

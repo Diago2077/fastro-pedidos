@@ -20,6 +20,12 @@ export async function renderSettings(container) {
   const reportRecipients = (() => { try { return JSON.parse(cfg.report_recipients || '[]'); } catch { return []; } })();
   // Notificaciones push: el envío manual puede ir a cualquier usuario activo.
   const notifyUsers = (usersData || []);
+  // Destinatarios de avisos de cambio de estado (lista propia de notificaciones).
+  // Si todavía no se configuró, hereda lo de "Reportes por correo" como punto de partida.
+  const notifyRecipients = (() => {
+    if (cfg.notify_recipients == null) return reportRecipients;
+    try { return JSON.parse(cfg.notify_recipients || '[]'); } catch { return []; }
+  })();
   const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
   // Orden de tallas: el guardado primero (solo los que aún existen), luego las tallas nuevas
@@ -110,9 +116,8 @@ export async function renderSettings(container) {
         <div class="card-header"><h5 class="card-title"><i class="fas fa-bell"></i> Notificaciones</h5></div>
         <div class="card-body">
           <p class="form-hint" style="margin-bottom:12px">
-            Avisos al celular/PC (incluso con la app cerrada) cuando un pedido cambia de estado.
-            Llegan a los <strong>mismos usuarios marcados arriba en “Reportes por correo”</strong>
-            (excepto a quien hizo el cambio) que además hayan activado las notificaciones en su dispositivo.
+            Avisos al celular/PC (incluso con la app cerrada). Cada usuario debe activar las
+            notificaciones en su dispositivo para recibirlas.
           </p>
 
           <label class="form-label">Este dispositivo</label>
@@ -124,7 +129,27 @@ export async function renderSettings(container) {
             En iPhone/iPad hay que instalar la app en la pantalla de inicio para recibir avisos.
           </small>
 
+          <label class="form-label" style="margin-top:16px">Avisos de cambio de estado</label>
+          <small class="form-hint" style="display:block;margin-bottom:8px">
+            Marcá quién recibe el aviso cuando un pedido cambia de estado (no se avisa a quien lo cambió).
+          </small>
+          <div id="notify-recipients" class="report-recipients">
+            ${notifyUsers.length ? notifyUsers.map(u => `
+              <label class="report-recipient">
+                <input type="checkbox" value="${esc(u.id)}" ${notifyRecipients.includes(u.id) ? 'checked' : ''}>
+                <span class="report-recipient-info">${esc(u.name)}</span>
+              </label>`).join('') : '<p class="text-muted" style="padding:6px 0">No hay usuarios activos.</p>'}
+          </div>
+          <div class="form-footer">
+            <button type="button" class="btn btn-accent" id="btn-save-notify-cfg"><i class="fas fa-save"></i> Guardar destinatarios</button>
+          </div>
+
           <label class="form-label" style="margin-top:16px">Enviar notificación manual</label>
+          <div class="notif-manual-row notif-broadcast-row" style="margin-bottom:10px">
+            <span class="notif-manual-name"><strong>A todos</strong></span>
+            <input type="text" id="notif-broadcast-msg" class="form-control form-control-sm notif-manual-msg" placeholder="Mensaje para todos…">
+            <button type="button" class="btn btn-sm btn-accent" id="notif-broadcast-send" title="Enviar a todos"><i class="fas fa-paper-plane"></i></button>
+          </div>
           <div class="notif-manual">
             ${notifyUsers.length ? notifyUsers.map(u => `
               <div class="notif-manual-row" data-user="${esc(u.id)}">
@@ -301,6 +326,41 @@ export async function renderSettings(container) {
     if (data?.error) { toast('No se pudo enviar: ' + data.error, 'error'); return; }
     if (!data?.sent) { toast('El usuario no tiene dispositivos con notificaciones activas', 'warning'); return; }
     toast(`Notificación enviada (${data.sent} dispositivo/s)`);
+    if (input) input.value = '';
+  });
+
+  // ---- Notificaciones: guardar destinatarios de avisos de cambio de estado ----
+  document.getElementById('btn-save-notify-cfg')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-save-notify-cfg');
+    const ids = [...document.querySelectorAll('#notify-recipients input:checked')].map(c => c.value);
+    setLoading(btn, true);
+    const { error } = await db.from('app_config').upsert(
+      { key: 'notify_recipients', value: JSON.stringify(ids), updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
+    setLoading(btn, false);
+    if (error) { toast('Error: ' + error.message, 'error'); return; }
+    toast('Destinatarios de notificaciones guardados');
+  });
+
+  // ---- Notificaciones: envío manual a TODOS ----
+  document.getElementById('notif-broadcast-send')?.addEventListener('click', async () => {
+    const btn = document.getElementById('notif-broadcast-send');
+    const input = document.getElementById('notif-broadcast-msg');
+    const message = (input?.value || '').trim();
+    if (!message) { toast('Escribí un mensaje', 'warning'); return; }
+    setLoading(btn, true);
+    const { data, error } = await db.functions.invoke('send-push', { body: { type: 'broadcast', message } });
+    setLoading(btn, false);
+    if (error) {
+      let msg = error.message;
+      try { const j = await error.context.json(); if (j?.error) msg = j.error; } catch {}
+      toast('No se pudo enviar: ' + msg, 'error');
+      return;
+    }
+    if (data?.error) { toast('No se pudo enviar: ' + data.error, 'error'); return; }
+    if (!data?.sent) { toast('Ningún usuario tiene notificaciones activas', 'warning'); return; }
+    toast(`Notificación enviada a todos (${data.sent} dispositivo/s)`);
     if (input) input.value = '';
   });
 

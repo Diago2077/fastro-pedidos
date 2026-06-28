@@ -6,7 +6,7 @@
 // ============================================================
 // El nombre de la caché incluye la versión: al cambiarla, el evento
 // 'activate' borra la caché vieja. Mantenelo igual a APP_VERSION (js/version.js).
-const CACHE = 'fastro-v1.9.4';
+const CACHE = 'fastro-v1.9.5';
 
 const SHELL = [
   './',

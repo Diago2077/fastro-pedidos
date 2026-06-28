@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       if (!message)   return json({ error: 'El mensaje está vacío' }, 400);
 
       recipientIds = [targetId];
-      payload = { title: String(body?.title || 'FASTRO'), body: message, url: '/' };
+      payload = { title: String(body?.title || 'Mensaje'), body: message, url: '/' };
     } else {
       // order_status: destinatarios = report_recipients, menos el actor.
       const orderId = String(body?.orderId || '');
@@ -124,11 +124,13 @@ Deno.serve(async (req) => {
       recipientIds = recipientIds.filter((id) => id && id !== user.id); // no avisar al actor
       if (!recipientIds.length) return json({ ok: true, sent: 0, failed: 0, note: 'sin destinatarios' });
 
-      const { data: ord } = await admin.from('orders').select('order_number').eq('id', orderId).maybeSingle();
-      const numero = ord?.order_number || 'sin número';
+      const { data: ord } = await admin.from('orders').select('order_number, clients(name)').eq('id', orderId).maybeSingle();
+      const numero  = ord?.order_number || 'sin número';
+      const cliente = (ord as any)?.clients?.name || '';
+      const estado  = STATUS_LABEL[status] || status;
       payload = {
-        title: `FASTRO — Pedido ${numero}`,
-        body:  `Pasó a ${STATUS_LABEL[status] || status}`,
+        title: `Pedido ${numero}`,
+        body:  cliente ? `${cliente} · Pasó a ${estado}` : `Pasó a ${estado}`,
         url:   '/?go=orders',
       };
     }

@@ -12,13 +12,16 @@
 //       manual exige además rol admin. Desplegar con Verify JWT = OFF (la
 //       función hace su propia validación, como send-report).
 //
+// Envío con `@negrel/webpush` (nativo de Deno / WebCrypto — NO usa la librería
+// npm:web-push, que crashea en el runtime de Supabase Edge).
+//
 // Secrets requeridos (Supabase → Edge Functions → Secrets):
 //   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY  → par de claves (npx web-push generate-vapid-keys)
 //   VAPID_SUBJECT                        → mailto:tu-correo  (ej. mailto:facturacion.fastro@gmail.com)
 //   (SUPABASE_URL, SUPABASE_ANON_KEY y SUPABASE_SERVICE_ROLE_KEY ya vienen inyectados)
 // ============================================================
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import webpush from 'npm:web-push@3.6.7';
+import * as webpush from 'jsr:@negrel/webpush@0.5.0';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY     = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -26,10 +29,6 @@ const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const VAPID_PUBLIC  = Deno.env.get('VAPID_PUBLIC_KEY')  || '';
 const VAPID_PRIVATE = Deno.env.get('VAPID_PRIVATE_KEY') || '';
 const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT')     || 'mailto:admin@fastro.app';
-
-if (VAPID_PUBLIC && VAPID_PRIVATE) {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
-}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -41,6 +40,41 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
 const STATUS_LABEL: Record<string, string> = { open: 'Abierto', sent: 'Enviado', closed: 'Cerrado' };
+
+// ---- VAPID: convertir las claves base64url (formato web-push) a JWK ----
+function b64urlToBytes(s: string): Uint8Array {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  s += '='.repeat((4 - (s.length % 4)) % 4);
+  const bin = atob(s);
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u;
+}
+function bytesToB64url(b: Uint8Array): string {
+  let s = '';
+  for (const x of b) s += String.fromCharCode(x);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function vapidJwks() {
+  const pub = b64urlToBytes(VAPID_PUBLIC); // 65 bytes: 0x04 || X(32) || Y(32)
+  const x = bytesToB64url(pub.slice(1, 33));
+  const y = bytesToB64url(pub.slice(33, 65));
+  const d = VAPID_PRIVATE.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const base = { kty: 'EC', crv: 'P-256', alg: 'ES256', ext: true };
+  return {
+    publicKey:  { ...base, x, y, key_ops: ['verify'] },
+    privateKey: { ...base, x, y, d, key_ops: ['sign'] },
+  };
+}
+
+// ApplicationServer cacheado entre invocaciones (reúsa el worker).
+let _appServer: webpush.ApplicationServer | null = null;
+async function getAppServer() {
+  if (_appServer) return _appServer;
+  const vapidKeys = await webpush.importVapidKeys(vapidJwks(), { extractable: true });
+  _appServer = await webpush.ApplicationServer.new({ contactInformation: VAPID_SUBJECT, vapidKeys });
+  return _appServer;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -78,11 +112,7 @@ Deno.serve(async (req) => {
       if (!message)   return json({ error: 'El mensaje está vacío' }, 400);
 
       recipientIds = [targetId];
-      payload = {
-        title: String(body?.title || 'FASTRO'),
-        body:  message,
-        url:   '/',
-      };
+      payload = { title: String(body?.title || 'FASTRO'), body: message, url: '/' };
     } else {
       // order_status: destinatarios = report_recipients, menos el actor.
       const orderId = String(body?.orderId || '');
@@ -111,19 +141,20 @@ Deno.serve(async (req) => {
     if (!subs || !subs.length) return json({ ok: true, sent: 0, failed: 0, note: 'sin dispositivos suscriptos' });
 
     // ---- Enviar a cada dispositivo ----
+    const appServer = await getAppServer();
     const data = JSON.stringify(payload);
     let sent = 0, failed = 0;
     const deadIds: string[] = [];
 
     await Promise.all(subs.map(async (s: any) => {
-      const subscription = { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } };
       try {
-        await webpush.sendNotification(subscription, data);
+        const subscriber = appServer.subscribe({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } });
+        await subscriber.pushTextMessage(data, { urgency: webpush.Urgency.High });
         sent++;
       } catch (err: any) {
         failed++;
-        const code = err?.statusCode;
-        if (code === 404 || code === 410) deadIds.push(s.id); // suscripción muerta
+        const status = err?.response?.status;
+        if (status === 404 || status === 410) deadIds.push(s.id); // suscripción muerta
       }
     }));
 

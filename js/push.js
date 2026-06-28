@@ -10,6 +10,7 @@
 // ============================================================
 import { db } from './supabase.js';
 import { getSession } from './auth.js';
+import { toast } from './utils/helpers.js';
 
 export const VAPID_PUBLIC_KEY = 'BMaqnA-g6tFg_rOCX182ReO5olqIXFrzTBAL5LEphcCBoN-ixhPP4EYPJvoZzz9iaAK8Q64DhGIKqwFr_abWfx8';
 
@@ -34,19 +35,11 @@ export async function isSubscribed() {
   } catch { return false; }
 }
 
-// Activar: pide permiso, suscribe y guarda la suscripción en la base.
-// Devuelve true si quedó activado.
-export async function enablePush() {
-  if (!isPushSupported()) throw new Error('Este dispositivo no soporta notificaciones.');
-  if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.startsWith('PEGAR_AQUI')) {
-    throw new Error('Falta configurar la clave pública VAPID en js/push.js.');
-  }
+// Suscribe el dispositivo y guarda/actualiza la fila. Asume permiso concedido.
+// Lanza error si algo falla (para que el llamador lo muestre).
+async function subscribeAndSave() {
   const me = getSession();
   if (!me?.id) throw new Error('No hay sesión activa.');
-
-  const perm = await Notification.requestPermission();
-  if (perm !== 'granted') throw new Error('Permiso de notificaciones denegado.');
-
   const reg = await navigator.serviceWorker.ready;
   let sub = await reg.pushManager.getSubscription();
   if (!sub) {
@@ -55,7 +48,6 @@ export async function enablePush() {
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
     });
   }
-
   const json = sub.toJSON();
   const { error } = await db.from('push_subscriptions').upsert({
     user_id:    me.id,
@@ -65,8 +57,69 @@ export async function enablePush() {
     user_agent: navigator.userAgent,
   }, { onConflict: 'endpoint' });
   if (error) throw new Error(error.message);
+}
 
+// Activar: pide permiso (gesto del usuario), suscribe y guarda. Devuelve true.
+export async function enablePush() {
+  if (!isPushSupported()) throw new Error('Este dispositivo no soporta notificaciones.');
+  if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.startsWith('PEGAR_AQUI')) {
+    throw new Error('Falta configurar la clave pública VAPID en js/push.js.');
+  }
+  if (!getSession()?.id) throw new Error('No hay sesión activa.');
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') throw new Error('Permiso de notificaciones denegado.');
+  await subscribeAndSave();
   return true;
+}
+
+// Re-suscribir en SILENCIO si el permiso ya está concedido (sin prompt).
+// Se llama en cada arranque: así la suscripción queda SIEMPRE activa,
+// aunque la app se haya actualizado. Devuelve true si quedó suscripto.
+export async function ensurePushSubscribed() {
+  if (!isPushSupported() || Notification.permission !== 'granted') return false;
+  if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.startsWith('PEGAR_AQUI')) return false;
+  try { await subscribeAndSave(); return true; } catch { return false; }
+}
+
+// Inicialización para CUALQUIER usuario (no solo Admin): se llama al entrar.
+//  - permiso concedido  → re-suscribe en silencio (queda siempre activa).
+//  - permiso sin definir → muestra el cartel para activar (todos los usuarios).
+//  - permiso denegado    → no hace nada.
+export function initPushForUser() {
+  if (!isPushSupported()) return;
+  const perm = Notification.permission;
+  if (perm === 'granted') { ensurePushSubscribed(); return; }
+  if (perm === 'default') showNotifPrompt();
+}
+
+// Cartel no bloqueante para ofrecer activar las notificaciones. Si lo descartan,
+// no vuelve a aparecer por unos días (snooze en localStorage).
+function showNotifPrompt() {
+  const SNOOZE_KEY = 'fastro_notif_snooze';
+  try { if (Number(localStorage.getItem(SNOOZE_KEY) || 0) > Date.now()) return; } catch {}
+  const banner = document.getElementById('notif-banner');
+  if (!banner) return;
+  banner.classList.remove('hidden');
+
+  const enableBtn  = document.getElementById('notif-enable-btn');
+  const dismissBtn = document.getElementById('notif-dismiss-btn');
+  if (enableBtn) enableBtn.onclick = async () => {
+    enableBtn.disabled = true;
+    enableBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    try {
+      await enablePush();
+      toast('Notificaciones activadas');
+      banner.classList.add('hidden');
+    } catch (e) {
+      toast(e.message || 'No se pudo activar', 'error');
+      enableBtn.disabled = false;
+      enableBtn.textContent = 'Activar';
+    }
+  };
+  if (dismissBtn) dismissBtn.onclick = () => {
+    banner.classList.add('hidden');
+    try { localStorage.setItem(SNOOZE_KEY, String(Date.now() + 3 * 24 * 60 * 60 * 1000)); } catch {}
+  };
 }
 
 // Desactivar en este dispositivo: cancela la suscripción y borra su fila.

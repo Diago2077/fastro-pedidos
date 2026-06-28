@@ -258,6 +258,28 @@ a { color: inherit; text-decoration: none; }
 .sidebar-version .btn-outline:hover { background: rgba(255,255,255,.12); color: #fff; }
 
 /* Banner de nueva versión */
+/* Cartel para activar notificaciones (no bloqueante, abajo centrado). */
+.notif-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--bottom-nav-h, 0px) + 16px);
+  transform: translateX(-50%);
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 24px);
+  padding: 10px 12px 10px 16px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .25);
+}
+.notif-banner.hidden { display: none; }
+.notif-banner > span { font-size: .9em; }
+.notif-banner > span i { color: var(--accent); margin-right: 4px; }
+
 /* Aviso de nueva versión: popup bloqueante (cubre toda la pantalla y solo
    permite continuar al tocar "Actualizar"; no se puede descartar). */
 .update-modal {

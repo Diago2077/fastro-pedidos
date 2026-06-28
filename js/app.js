@@ -16,6 +16,7 @@ import { renderProviders }  from './modules/providers.js';
 import { renderUsers }      from './modules/users.js';
 import { renderReports }    from './modules/reports.js';
 import { renderSettings }   from './modules/settings.js';
+import { initPushForUser }  from './push.js';
 
 // Tooltip global: muestra el texto completo de una celda recortada al pasar el mouse.
 document.addEventListener('mouseover', e => {
@@ -110,6 +111,10 @@ function showApp(user) {
 
   // Versión + actualización (PWA)
   setupUpdateUI();
+
+  // Notificaciones push: re-suscribe en silencio si ya hay permiso, o muestra
+  // el cartel para activarlas. Funciona para TODOS los usuarios (no solo Admin).
+  initPushForUser();
 
   // Show/hide nav items based on permissions
   document.querySelectorAll('.nav-link[data-section]').forEach(link => {

@@ -6,7 +6,7 @@
 // ============================================================
 // El nombre de la caché incluye la versión: al cambiarla, el evento
 // 'activate' borra la caché vieja. Mantenelo igual a APP_VERSION (js/version.js).
-const CACHE = 'fastro-v1.8.4';
+const CACHE = 'fastro-v1.9.0';
 
 const SHELL = [
   './',
@@ -17,6 +17,7 @@ const SHELL = [
   './js/version.js',
   './js/auth.js',
   './js/supabase.js',
+  './js/push.js',
   './js/utils/helpers.js',
   './js/utils/export.js',
   './js/utils/sizes.js',
@@ -74,5 +75,37 @@ self.addEventListener('fetch', (event) => {
         return res;
       })
       .catch(() => caches.match(req).then((cached) => cached || caches.match('./index.html')))
+  );
+});
+
+// ============================================================
+// NOTIFICACIONES PUSH
+// Muestra el aviso que envía la Edge Function `send-push`.
+// ============================================================
+self.addEventListener('push', (event) => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch (e) { d = {}; }
+  const title = d.title || 'FASTRO';
+  const options = {
+    body:  d.body || '',
+    icon:  './assets/icon-192.png',
+    badge: './assets/icon-192.png',
+    tag:   d.tag || 'fastro',
+    data:  { url: d.url || './' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Al tocar la notificación: enfocar una pestaña abierta o abrir la app.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || './';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) {
+        if ('focus' in c) { c.focus(); if ('navigate' in c) c.navigate(target).catch(() => {}); return; }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(target);
+    })
   );
 });

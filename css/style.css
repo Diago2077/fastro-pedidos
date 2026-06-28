@@ -1707,6 +1707,38 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
 .report-sched-row span { white-space: nowrap; }
 .report-sched-select { width: auto; min-width: 120px; margin-left: auto; }
 
+/* Notificaciones push */
+.notif-device {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.notif-status { font-size: .9em; color: var(--text-muted); }
+.notif-device .btn { margin-left: auto; }
+.notif-manual {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.notif-manual-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.notif-manual-name {
+  flex: 0 0 32%;
+  min-width: 90px;
+  font-size: .9em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notif-manual-msg { flex: 1 1 auto; min-width: 0; }
+.notif-manual-send { flex-shrink: 0; }
+
 /* Aviso de conflicto de marca al importar */
 .import-conflict-box {
   padding: 12px 16px;

@@ -1,6 +1,7 @@
 import { db } from '../supabase.js';
 import { toast, setLoading, esc } from '../utils/helpers.js';
 import { setSizeOrderCache } from '../utils/sizes.js';
+import { isPushSupported, getPermissionState, isSubscribed, enablePush, disablePush } from '../push.js';
 
 export async function renderSettings(container) {
   container.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin fa-2x"></i></div>`;
@@ -17,6 +18,8 @@ export async function renderSettings(container) {
   // Reportes por correo: usuarios con email + destinatarios ya elegidos
   const reportUsers = (usersData || []).filter(u => u.email);
   const reportRecipients = (() => { try { return JSON.parse(cfg.report_recipients || '[]'); } catch { return []; } })();
+  // Notificaciones push: el envío manual puede ir a cualquier usuario activo.
+  const notifyUsers = (usersData || []);
   const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
   // Orden de tallas: el guardado primero (solo los que aún existen), luego las tallas nuevas
@@ -99,6 +102,36 @@ export async function renderSettings(container) {
           <div class="form-footer" style="gap:8px">
             <button type="button" class="btn btn-outline" id="btn-send-report-now"><i class="fas fa-paper-plane"></i> Enviar ahora</button>
             <button type="button" class="btn btn-accent" id="btn-save-report-cfg"><i class="fas fa-save"></i> Guardar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h5 class="card-title"><i class="fas fa-bell"></i> Notificaciones</h5></div>
+        <div class="card-body">
+          <p class="form-hint" style="margin-bottom:12px">
+            Avisos al celular/PC (incluso con la app cerrada) cuando un pedido cambia de estado.
+            Llegan a los <strong>mismos usuarios marcados arriba en “Reportes por correo”</strong>
+            (excepto a quien hizo el cambio) que además hayan activado las notificaciones en su dispositivo.
+          </p>
+
+          <label class="form-label">Este dispositivo</label>
+          <div class="notif-device">
+            <span id="notif-status" class="notif-status">Comprobando…</span>
+            <button type="button" class="btn btn-outline" id="btn-notif-toggle" disabled>…</button>
+          </div>
+          <small class="form-hint" style="display:block;margin-top:6px">
+            En iPhone/iPad hay que instalar la app en la pantalla de inicio para recibir avisos.
+          </small>
+
+          <label class="form-label" style="margin-top:16px">Enviar notificación manual</label>
+          <div class="notif-manual">
+            ${notifyUsers.length ? notifyUsers.map(u => `
+              <div class="notif-manual-row" data-user="${esc(u.id)}">
+                <span class="notif-manual-name">${esc(u.name)}</span>
+                <input type="text" class="form-control form-control-sm notif-manual-msg" placeholder="Mensaje…">
+                <button type="button" class="btn btn-sm btn-accent notif-manual-send" title="Enviar"><i class="fas fa-paper-plane"></i></button>
+              </div>`).join('') : '<p class="text-muted" style="padding:6px 0">No hay usuarios activos.</p>'}
           </div>
         </div>
       </div>
@@ -206,6 +239,72 @@ export async function renderSettings(container) {
     toast(`Reporte enviado a ${data?.sent ?? ids.length} destinatario(s)`);
   });
 
+  // ---- Notificaciones: activar/desactivar en este dispositivo ----
+  const notifStatusEl = document.getElementById('notif-status');
+  const notifToggleEl = document.getElementById('btn-notif-toggle');
+
+  async function refreshNotifUI() {
+    if (!notifStatusEl || !notifToggleEl) return;
+    if (!isPushSupported()) {
+      notifStatusEl.textContent = 'No soportado en este dispositivo';
+      notifToggleEl.classList.add('hidden');
+      return;
+    }
+    if (getPermissionState() === 'denied') {
+      notifStatusEl.textContent = 'Bloqueadas en el navegador';
+      notifToggleEl.classList.add('hidden');
+      return;
+    }
+    const on = await isSubscribed();
+    notifStatusEl.textContent = on ? 'Activadas en este dispositivo' : 'Desactivadas';
+    notifToggleEl.classList.remove('hidden');
+    notifToggleEl.disabled = false;
+    notifToggleEl.dataset.on = on ? '1' : '0';
+    notifToggleEl.innerHTML = on
+      ? '<i class="fas fa-bell-slash"></i> Desactivar'
+      : '<i class="fas fa-bell"></i> Activar';
+  }
+
+  notifToggleEl?.addEventListener('click', async () => {
+    setLoading(notifToggleEl, true);
+    try {
+      if (notifToggleEl.dataset.on === '1') { await disablePush(); toast('Notificaciones desactivadas'); }
+      else { await enablePush(); toast('Notificaciones activadas en este dispositivo'); }
+    } catch (e) {
+      toast(e.message || 'No se pudo cambiar', 'error');
+    } finally {
+      setLoading(notifToggleEl, false);
+      refreshNotifUI();
+    }
+  });
+
+  // ---- Notificaciones: envío manual por usuario ----
+  document.querySelector('.notif-manual')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.notif-manual-send');
+    if (!btn) return;
+    const row = btn.closest('.notif-manual-row');
+    const userId = row?.dataset.user;
+    const input = row?.querySelector('.notif-manual-msg');
+    const message = (input?.value || '').trim();
+    if (!userId) return;
+    if (!message) { toast('Escribí un mensaje', 'warning'); return; }
+
+    setLoading(btn, true);
+    const { data, error } = await db.functions.invoke('send-push', { body: { type: 'manual', userId, message } });
+    setLoading(btn, false);
+    if (error) {
+      let msg = error.message;
+      try { const j = await error.context.json(); if (j?.error) msg = j.error; } catch {}
+      toast('No se pudo enviar: ' + msg, 'error');
+      return;
+    }
+    if (data?.error) { toast('No se pudo enviar: ' + data.error, 'error'); return; }
+    if (!data?.sent) { toast('El usuario no tiene dispositivos con notificaciones activas', 'warning'); return; }
+    toast(`Notificación enviada (${data.sent} dispositivo/s)`);
+    if (input) input.value = '';
+  });
+
+  refreshNotifUI();
   renderList();
 }
 

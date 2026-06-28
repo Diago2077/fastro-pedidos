@@ -4,6 +4,7 @@ import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
 import { getSession, isAdmin, canExportExcel, canCreateOrders, canEditOrders, canDeleteOrders } from '../auth.js';
+import { notifyOrderStatus } from '../push.js';
 
 // In-memory state for order editing
 let _state = {
@@ -219,6 +220,7 @@ export async function renderOrders(container) {
       const { error } = await db.from('orders').update(update).eq('id', id);
       if (error) { toast('No se pudo cambiar el estado: ' + error.message, 'error'); return; }
       toast(`Estado: ${STATUS_LABELS[next]}`);
+      notifyOrderStatus(id, next); // avisar a los destinatarios (sin el actor)
       load();
     }
   });
@@ -529,6 +531,7 @@ async function openOrderModal(orderId, onSavedFn) {
     if (!ok) { statusEl.value = current; return; }
 
     toast(`Estado cambiado a "${STATUS_LABELS[next]}"`, 'success');
+    notifyOrderStatus(orderId, next); // avisar a los destinatarios (sin el actor)
     // Re-abrir el pedido para reflejar el bloqueo/desbloqueo de la edición.
     window.removeEventListener('beforeunload', beforeUnload);
     window._ord.open(orderId);

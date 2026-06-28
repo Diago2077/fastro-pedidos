@@ -6,7 +6,7 @@
 // ============================================================
 // El nombre de la caché incluye la versión: al cambiarla, el evento
 // 'activate' borra la caché vieja. Mantenelo igual a APP_VERSION (js/version.js).
-const CACHE = 'fastro-v1.9.1';
+const CACHE = 'fastro-v1.9.2';
 
 const SHELL = [
   './',
@@ -31,6 +31,7 @@ const SHELL = [
   './js/modules/reports.js',
   './js/modules/settings.js',
   './assets/logo.png',
+  './assets/badge-96.png',
   './assets/icon-192.png',
   './assets/icon-512.png',
   './assets/apple-touch-icon.png'
@@ -89,7 +90,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body:  d.body || '',
     icon:  './assets/icon-192.png',
-    badge: './assets/icon-192.png',
+    badge: './assets/badge-96.png',
     tag:   d.tag || 'fastro',
     data:  { url: d.url || './' },
   };

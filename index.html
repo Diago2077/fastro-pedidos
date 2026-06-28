@@ -188,11 +188,14 @@
 <!-- ========== TOASTS ========== -->
 <div id="toast-container"></div>
 
-<!-- ========== AVISO DE NUEVA VERSIÓN ========== -->
-<div id="update-banner" class="update-banner hidden">
-  <span><i class="fas fa-arrow-rotate-right"></i> Hay una nueva versión disponible.</span>
-  <button class="btn btn-sm btn-accent" id="update-now-btn">Actualizar</button>
-  <button class="icon-btn" id="update-dismiss-btn" title="Más tarde"><i class="fas fa-times"></i></button>
+<!-- ========== AVISO DE NUEVA VERSIÓN (bloqueante: solo continúa al Actualizar) ========== -->
+<div id="update-modal" class="update-modal hidden" role="alertdialog" aria-modal="true" aria-labelledby="update-modal-title">
+  <div class="update-modal-card">
+    <div class="update-modal-icon"><i class="fas fa-arrow-rotate-right"></i></div>
+    <h3 class="update-modal-title" id="update-modal-title">Nueva versión disponible</h3>
+    <p class="update-modal-msg">Hay una actualización lista. Tocá <strong>Actualizar</strong> para continuar con la última versión.</p>
+    <button class="btn btn-accent update-modal-btn" id="update-now-btn"><i class="fas fa-arrow-rotate-right"></i> Actualizar</button>
+  </div>
 </div>
 
 <!-- ========== SCRIPTS ========== -->

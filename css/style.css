@@ -258,26 +258,47 @@ a { color: inherit; text-decoration: none; }
 .sidebar-version .btn-outline:hover { background: rgba(255,255,255,.12); color: #fff; }
 
 /* Banner de nueva versión */
-.update-banner {
+/* Aviso de nueva versión: popup bloqueante (cubre toda la pantalla y solo
+   permite continuar al tocar "Actualizar"; no se puede descartar). */
+.update-modal {
   position: fixed;
-  left: 50%;
-  bottom: calc(var(--bottom-nav-h, 0px) + 16px);
-  transform: translateX(-50%);
-  z-index: 1300;
+  inset: 0;
+  z-index: 3000;
   display: flex;
   align-items: center;
-  gap: 12px;
-  max-width: calc(100vw - 24px);
-  padding: 10px 12px 10px 16px;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, .6);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+.update-modal.hidden { display: none; }
+.update-modal-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 28px 24px;
+  text-align: center;
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 28px rgba(0,0,0,.25);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .45);
 }
-.update-banner.hidden { display: none; }
-.update-banner > span { font-size: .9em; }
-.update-banner > span i { color: var(--accent); margin-right: 4px; }
+.update-modal-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1.5em;
+}
+.update-modal-title { margin: 0 0 8px; font-size: 1.15em; font-weight: 700; }
+.update-modal-msg { margin: 0 0 20px; font-size: .9em; color: var(--text-muted); line-height: 1.5; }
+.update-modal-btn { width: 100%; }
 
 .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 440; }
 

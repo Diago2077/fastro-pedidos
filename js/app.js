@@ -223,14 +223,19 @@ function setupUpdateUI() {
     await window.AppUpdate?.force();
   });
 
-  // Banner cuando hay una versión nueva en espera
-  const banner = document.getElementById('update-banner');
-  const showBanner = () => banner?.classList.remove('hidden');
-  if (window.AppUpdate?.updateReady) showBanner();
-  window.addEventListener('fastro:update-available', showBanner);
+  // Popup bloqueante cuando hay una versión nueva en espera: solo se puede
+  // continuar tocando "Actualizar" (sin opción de descartar).
+  const updateModal = document.getElementById('update-modal');
+  const showUpdate = () => updateModal?.classList.remove('hidden');
+  if (window.AppUpdate?.updateReady) showUpdate();
+  window.addEventListener('fastro:update-available', showUpdate);
 
-  document.getElementById('update-now-btn')?.addEventListener('click', () => window.AppUpdate?.applyWaiting());
-  document.getElementById('update-dismiss-btn')?.addEventListener('click', () => banner?.classList.add('hidden'));
+  const updateBtn = document.getElementById('update-now-btn');
+  updateBtn?.addEventListener('click', () => {
+    updateBtn.disabled = true;
+    updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Actualizando…';
+    window.AppUpdate?.applyWaiting();
+  });
 }
 
 function syncThemeIcon() {

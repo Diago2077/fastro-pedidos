@@ -234,7 +234,7 @@ export async function renderOrders(container) {
       if (extraObs && extraObs.trim()) {
         const { data: cur } = await db.from('orders').select('observation').eq('id', id).maybeSingle();
         const existing = (cur?.observation || '').trim();
-        update.observation = existing ? `${existing} ${extraObs.trim()}` : extraObs.trim();
+        update.observation = existing ? `${existing}\n${extraObs.trim()}` : extraObs.trim();
       }
       const { error } = await db.from('orders').update(update).eq('id', id);
       if (error) { toast('No se pudo cambiar el estado: ' + error.message, 'error'); return; }
@@ -532,7 +532,7 @@ async function openOrderModal(orderId, onSavedFn) {
       if (extra === null) return; // canceló
       if (extra.trim()) {
         const existing = (obsEl?.value || '').trim();
-        obsToSave = existing ? `${existing} ${extra.trim()}` : extra.trim();
+        obsToSave = existing ? `${existing}\n${extra.trim()}` : extra.trim();
         if (obsEl) obsEl.value = obsToSave; // reflejar en el formulario
       }
     } else if (!await confirm2(`¿Cambiar estado a "${STATUS_LABELS[next]}"?`)) {

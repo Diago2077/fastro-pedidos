@@ -191,6 +191,53 @@ export function confirm2(msg) {
   return confirmDialog({ title: msg, danger: true, confirmText: 'Sí', cancelText: 'No' });
 }
 
+// Diálogo con cuadro de texto (textarea). Devuelve Promise<string|null>:
+// el texto ingresado (puede ser vacío) o null si se cancela/cierra.
+export function promptDialog(opts = {}) {
+  const {
+    title = 'Escribí un texto',
+    message = '',
+    placeholder = '',
+    value = '',
+    confirmText = 'Aceptar',
+    cancelText = 'Cancelar',
+  } = opts;
+
+  return new Promise(resolve => {
+    const back = document.createElement('div');
+    back.className = 'cdialog-backdrop';
+    back.innerHTML = `
+      <div class="cdialog" role="dialog" aria-modal="true">
+        <h4 class="cdialog-title">${esc(title)}</h4>
+        ${message ? `<p class="cdialog-msg">${esc(message)}</p>` : ''}
+        <textarea class="form-control cdialog-input" rows="3" placeholder="${esc(placeholder)}">${esc(value)}</textarea>
+        <div class="cdialog-actions">
+          <button type="button" class="btn btn-secondary cdialog-cancel">${esc(cancelText)}</button>
+          <button type="button" class="btn btn-accent cdialog-ok">${esc(confirmText)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    requestAnimationFrame(() => back.classList.add('show'));
+
+    const ta = back.querySelector('.cdialog-input');
+    let done = false;
+    const close = (val) => {
+      if (done) return;
+      done = true;
+      back.classList.remove('show');
+      document.removeEventListener('keydown', onKey);
+      setTimeout(() => back.remove(), 180);
+      resolve(val);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); close(null); } };
+    back.querySelector('.cdialog-cancel').onclick = () => close(null);
+    back.querySelector('.cdialog-ok').onclick = () => close(ta.value);
+    back.addEventListener('mousedown', e => { if (e.target === back) close(null); });
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => ta.focus(), 60);
+  });
+}
+
 // --- Loading button ---
 export function setLoading(btn, on) {
   if (on) { btn.disabled = true; btn._orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }

@@ -1005,6 +1005,13 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
   line-height: 1.5;
   margin: 0 0 4px;
 }
+.cdialog-input {
+  width: 100%;
+  margin: 10px 0 2px;
+  text-align: left;
+  resize: vertical;
+}
+
 .cdialog-actions {
   display: flex;
   gap: 10px;

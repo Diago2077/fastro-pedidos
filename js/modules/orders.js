@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { toast, openModal, closeModal, confirm2, confirmDialog, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableColumnResize, lazyRenderRows, enableRowClick, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
+import { toast, openModal, closeModal, confirm2, confirmDialog, promptDialog, emptyState, loadingHTML, setLoading, debounce, fCurrency, fNum, fDate, statusBadge, esc, enableTableSort, enableColumnResize, lazyRenderRows, enableRowClick, mountActionsMenu, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { sortSizes } from '../utils/sizes.js';
 import { createMultiFilter } from '../utils/filters.js';
@@ -214,9 +214,28 @@ export async function renderOrders(container) {
         toast('Solo un administrador puede hacer este cambio de estado', 'warning');
         return;
       }
-      if (!await confirm2(`¿Cambiar estado a "${STATUS_LABELS[next]}"?`)) return;
+
+      // Al pasar de Cerrado a Enviado: pedir una observación de envío.
+      let extraObs = null;
+      if (current === 'closed' && next === 'sent') {
+        extraObs = await promptDialog({
+          title: 'Marcar como Enviado',
+          message: 'Observación del envío (opcional). Se agrega a la Observación del pedido.',
+          placeholder: 'Ej: Enviado por encomienda…',
+          confirmText: 'Marcar Enviado', cancelText: 'Cancelar',
+        });
+        if (extraObs === null) return; // canceló
+      } else if (!await confirm2(`¿Cambiar estado a "${STATUS_LABELS[next]}"?`)) {
+        return;
+      }
+
       const update = { status: next, updated_at: new Date().toISOString() };
       if (next === 'sent') update.shipping_date = todayISO();
+      if (extraObs && extraObs.trim()) {
+        const { data: cur } = await db.from('orders').select('observation').eq('id', id).maybeSingle();
+        const existing = (cur?.observation || '').trim();
+        update.observation = existing ? `${existing} ${extraObs.trim()}` : extraObs.trim();
+      }
       const { error } = await db.from('orders').update(update).eq('id', id);
       if (error) { toast('No se pudo cambiar el estado: ' + error.message, 'error'); return; }
       toast(`Estado: ${STATUS_LABELS[next]}`);
@@ -499,7 +518,26 @@ async function openOrderModal(orderId, onSavedFn) {
       return;
     }
 
-    if (!await confirm2(`¿Cambiar estado a "${STATUS_LABELS[next]}"?`)) return;
+    // Al pasar de Cerrado a Enviado: pedir una observación de envío (se agrega
+    // a la Observación; si ya tiene texto, se pone al lado).
+    const obsEl = document.querySelector('#order-form [name=observation]');
+    let obsToSave; // si queda definido, se guarda como nueva Observación
+    if (current === 'closed' && next === 'sent') {
+      const extra = await promptDialog({
+        title: 'Marcar como Enviado',
+        message: 'Observación del envío (opcional). Se agrega a la Observación del pedido.',
+        placeholder: 'Ej: Enviado por encomienda…',
+        confirmText: 'Marcar Enviado', cancelText: 'Cancelar',
+      });
+      if (extra === null) return; // canceló
+      if (extra.trim()) {
+        const existing = (obsEl?.value || '').trim();
+        obsToSave = existing ? `${existing} ${extra.trim()}` : extra.trim();
+        if (obsEl) obsEl.value = obsToSave; // reflejar en el formulario
+      }
+    } else if (!await confirm2(`¿Cambiar estado a "${STATUS_LABELS[next]}"?`)) {
+      return;
+    }
 
     // Pedido nuevo (sin guardar aún): el estado queda en el formulario y se
     // guarda al tocar "Guardar". No hay nada que bloquear todavía.
@@ -523,6 +561,7 @@ async function openOrderModal(orderId, onSavedFn) {
     } else {
       const payload = { status: next, updated_at: new Date().toISOString() };
       if (next === 'sent') payload.shipping_date = todayISO();
+      if (obsToSave !== undefined) payload.observation = obsToSave;
       const { error } = await db.from('orders').update(payload).eq('id', orderId);
       if (error) { toast('No se pudo guardar el estado: ' + error.message, 'error'); statusEl.value = current; return; }
       if (onSavedFn) onSavedFn();

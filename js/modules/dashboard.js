@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { fCurrency, fMoney, fDate, enableTableSort, enableColumnResize, emptyState, loadingHTML, toast } from '../utils/helpers.js';
+import { fCurrency, fMoney, fDate, enableTableSort, enableColumnResize, emptyState, loadingHTML, toast, fetchAllRows } from '../utils/helpers.js';
 import { canSeeCost } from '../auth.js';
 
 const charts = {};
@@ -59,11 +59,14 @@ export async function renderDashboard(container) {
   if (recentTbl) recentTbl.innerHTML = loadingHTML();
 
   // Load data in parallel (con manejo de error para no quedar a medio render)
+  // fetchAllRows: Supabase corta en 1000 filas por consulta; con .order('id')
+  // pagina de forma estable hasta traer TODO (si no, los totales quedarían
+  // truncados en silencio al superar 1000 pedidos u order_items).
   let ordersRes, itemsRes, cfgRes;
   try {
     [ordersRes, itemsRes, cfgRes] = await Promise.all([
-      db.from('orders').select('id, order_number, status, discount_pct, season, created_at, clients(name), users:profiles(name)'),
-      db.from('order_items').select('order_id, quantity, unit_sale_price, unit_cost_price'),
+      fetchAllRows(() => db.from('orders').select('id, order_number, status, discount_pct, season, created_at, clients(name), users:profiles(name)').order('id')),
+      fetchAllRows(() => db.from('order_items').select('order_id, quantity, unit_sale_price, unit_cost_price').order('id')),
       db.from('app_config').select('value').eq('key', 'current_season').maybeSingle()
     ]);
   } catch (e) {

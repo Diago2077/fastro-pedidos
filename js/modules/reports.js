@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { fCurrency, fNum, enableTableSort, enableColumnResize } from '../utils/helpers.js';
+import { fCurrency, fNum, enableTableSort, enableColumnResize, fetchAllRows } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canSeeCost, canExportExcel } from '../auth.js';
 
@@ -30,12 +30,15 @@ async function loadReport(type) {
   if (!el) return;
   el.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin fa-2x"></i></div>`;
 
-  // Load orders with items (los Cancelados no suman en los reportes)
-  const { data: ordersRaw } = await db.from('orders')
-    .select('id, order_number, status, season, discount_pct, created_at, clients(name, city), users:profiles(name)');
+  // Load orders with items (los Cancelados no suman en los reportes).
+  // fetchAllRows: Supabase corta en 1000 filas; con .order('id') pagina de
+  // forma estable hasta traer todo (si no, los totales quedarían truncados
+  // en silencio al superar 1000 pedidos u order_items).
+  const { data: ordersRaw } = await fetchAllRows(() => db.from('orders')
+    .select('id, order_number, status, season, discount_pct, created_at, clients(name, city), users:profiles(name)').order('id'));
   const orders = (ordersRaw || []).filter(o => o.status !== 'cancelled');
-  const { data: items } = await db.from('order_items')
-    .select('order_id, quantity, unit_sale_price, unit_cost_price, product_variants(size, color, products(code, description))');
+  const { data: items } = await fetchAllRows(() => db.from('order_items')
+    .select('order_id, quantity, unit_sale_price, unit_cost_price, product_variants(size, color, products(code, description))').order('id'));
 
   const revByOrder = {};
   const costByOrder = {};

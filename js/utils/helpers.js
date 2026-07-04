@@ -126,7 +126,7 @@ export function fNum(n) {
 
 // --- Status badge ---
 export function statusBadge(s) {
-  const m = { open: ['Abierto', 'info'], closed: ['Cerrado', 'warning'], sent: ['Enviado', 'success'] };
+  const m = { open: ['Abierto', 'info'], closed: ['Cerrado', 'warning'], sent: ['Enviado', 'success'], cancelled: ['Cancelado', 'secondary'] };
   const [label, type] = m[s] || [s, 'secondary'];
   return `<span class="badge badge-${type}">${label}</span>`;
 }

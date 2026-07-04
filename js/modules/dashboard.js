@@ -77,7 +77,8 @@ export async function renderDashboard(container) {
     return;
   }
 
-  const orders = ordersRes.data || [];
+  // Los pedidos Cancelados no suman en KPIs, gráficos ni en "Últimos Pedidos".
+  const orders = (ordersRes.data || []).filter(o => o.status !== 'cancelled');
   const items  = itemsRes.data  || [];
   const currentSeason = (cfgRes.data?.value || '').trim();
 

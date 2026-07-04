@@ -30,9 +30,10 @@ async function loadReport(type) {
   if (!el) return;
   el.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin fa-2x"></i></div>`;
 
-  // Load orders with items
-  const { data: orders } = await db.from('orders')
+  // Load orders with items (los Cancelados no suman en los reportes)
+  const { data: ordersRaw } = await db.from('orders')
     .select('id, order_number, status, season, discount_pct, created_at, clients(name, city), users:profiles(name)');
+  const orders = (ordersRaw || []).filter(o => o.status !== 'cancelled');
   const { data: items } = await db.from('order_items')
     .select('order_id, quantity, unit_sale_price, unit_cost_price, product_variants(size, color, products(code, description))');
 

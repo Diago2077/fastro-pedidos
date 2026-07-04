@@ -71,6 +71,7 @@
 [data-theme="dark"] .status-btn.status-open   { background: rgba(49,130,206,.24); color: #90cdf4; }
 [data-theme="dark"] .status-btn.status-sent   { background: rgba(56,161,105,.24); color: #9ae6b4; }
 [data-theme="dark"] .status-btn.status-closed { background: rgba(214,158,46,.24); color: #f6e05e; }
+[data-theme="dark"] .status-btn.status-cancelled { background: rgba(160,174,192,.22); color: #cbd5e0; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -788,6 +789,7 @@ th.col-ver, .td-actions.col-ver { text-align: center; }
 .status-btn.status-open   { background: #bee3f8; color: #2a4a7f; }
 .status-btn.status-sent   { background: #c6f6d5; color: #276749; }
 .status-btn.status-closed { background: #fefcbf; color: #744210; }
+.status-btn.status-cancelled { background: #e2e8f0; color: #4a5568; }
 
 /* ============================================================
    SEARCH BOX

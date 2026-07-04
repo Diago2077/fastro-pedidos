@@ -13,7 +13,9 @@ let _state = {
 };
 let _allOrders = [];
 
-const STATUS_LABELS = { open: 'Abierto', sent: 'Enviado', closed: 'Cerrado' };
+const STATUS_LABELS = { open: 'Abierto', sent: 'Enviado', closed: 'Cerrado', cancelled: 'Cancelado' };
+// Ciclo normal de estados. "Cancelado" queda FUERA del ciclo: se entra/sale con
+// acciones aparte ("Cancelar pedido" / "Reactivar"), solo Admin.
 function nextStatus(s) { return { open: 'closed', closed: 'sent', sent: 'open' }[s] || 'open'; }
 function todayISO() { return new Date().toISOString().split('T')[0]; }
 
@@ -144,10 +146,11 @@ export async function renderOrders(container) {
     if (isAdmin()) _filter.setOptions('seller', [...sellers.entries()].sort((a, b) => String(a[1]).localeCompare(b[1])).map(([v, l]) => ({ value: v, label: l })));
     _filter.setOptions('season', [...seasons].sort().map(s => ({ value: s, label: s })));
     _filter.setOptions('status', [
-      { value: 'open',   label: 'Abierto' },
-      { value: 'sent',   label: 'Enviado' },
-      { value: 'closed', label: 'Cerrado' },
-      { value: '',       label: 'Todos' }
+      { value: 'open',      label: 'Abierto' },
+      { value: 'sent',      label: 'Enviado' },
+      { value: 'closed',    label: 'Cerrado' },
+      { value: 'cancelled', label: 'Cancelado' },
+      { value: '',          label: 'Todos' }
     ]);
     _filter.render();
   }
@@ -169,7 +172,7 @@ export async function renderOrders(container) {
     if (!el) return;
     if (!rows.length) {
       const st = _filter.getSelected('status')[0];
-      const stTxt = { open: ' abiertos', sent: ' enviados', closed: ' cerrados' }[st] || '';
+      const stTxt = { open: ' abiertos', sent: ' enviados', closed: ' cerrados', cancelled: ' cancelados' }[st] || '';
       el.innerHTML = emptyState(`No hay pedidos${stTxt}`); return;
     }
     const rowsHTML = rows.map(o => {
@@ -207,6 +210,17 @@ export async function renderOrders(container) {
       toast('Pedido eliminado'); closeModal(true); load();
     },
     async changeStatus(id, current) {
+      // Pedido cancelado: el botón de estado sirve para reactivarlo (solo Admin).
+      if (current === 'cancelled') {
+        if (!isAdmin()) { toast('Solo un administrador puede reactivar un pedido', 'warning'); return; }
+        if (!await confirm2('¿Reactivar este pedido? Volverá al estado "Abierto".')) return;
+        const { error } = await db.from('orders').update({ status: 'open', updated_at: new Date().toISOString() }).eq('id', id);
+        if (error) { toast('No se pudo reactivar: ' + error.message, 'error'); return; }
+        toast('Pedido reactivado');
+        notifyOrderStatus(id, 'open');
+        load();
+        return;
+      }
       const next = nextStatus(current);
       // Solo el Admin puede pasar de Cerrado→Enviado y de Enviado→Abierto.
       const adminOnly = (current === 'closed' && next === 'sent') || (current === 'sent' && next === 'open');
@@ -288,8 +302,8 @@ async function openOrderModal(orderId, onSavedFn) {
     }));
   }
 
-  // Enviado/Cerrado = solo lectura (lo usa renderItemsTable para los ítems)
-  _state.locked = order.status === 'sent' || order.status === 'closed';
+  // Enviado/Cerrado/Cancelado = solo lectura (lo usa renderItemsTable para los ítems)
+  _state.locked = order.status === 'sent' || order.status === 'closed' || order.status === 'cancelled';
 
   const html = buildOrderFormHTML(order, clients, providers, orderId);
 
@@ -576,6 +590,33 @@ async function openOrderModal(orderId, onSavedFn) {
     window._ord.open(orderId);
   });
 
+  // Cancelar pedido (solo Admin): no se borra, pasa a "Cancelado" y deja de sumar
+  // en Dashboard/Reportes. Se puede reactivar después.
+  document.getElementById('btn-cancel-order')?.addEventListener('click', async () => {
+    if (!isAdmin()) { toast('Solo un administrador puede cancelar un pedido', 'warning'); return; }
+    if (!await confirm2('¿Cancelar este pedido? No sumará en Dashboard ni Reportes. Podés reactivarlo más tarde.')) return;
+    const { error } = await db.from('orders').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', orderId);
+    if (error) { toast('No se pudo cancelar: ' + error.message, 'error'); return; }
+    toast('Pedido cancelado');
+    notifyOrderStatus(orderId, 'cancelled');
+    if (onSavedFn) onSavedFn();
+    window.removeEventListener('beforeunload', beforeUnload);
+    window._ord.open(orderId); // reabrir para reflejar el bloqueo
+  });
+
+  // Reactivar pedido cancelado (solo Admin): vuelve a "Abierto".
+  document.getElementById('btn-reactivate-order')?.addEventListener('click', async () => {
+    if (!isAdmin()) { toast('Solo un administrador puede reactivar un pedido', 'warning'); return; }
+    if (!await confirm2('¿Reactivar este pedido? Volverá al estado "Abierto".')) return;
+    const { error } = await db.from('orders').update({ status: 'open', updated_at: new Date().toISOString() }).eq('id', orderId);
+    if (error) { toast('No se pudo reactivar: ' + error.message, 'error'); return; }
+    toast('Pedido reactivado');
+    notifyOrderStatus(orderId, 'open');
+    if (onSavedFn) onSavedFn();
+    window.removeEventListener('beforeunload', beforeUnload);
+    window._ord.open(orderId);
+  });
+
   // Form submit
   document.getElementById('order-form')?.addEventListener('submit', e => {
     e.preventDefault();
@@ -635,13 +676,16 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
   const providerOpts = providers.map(p => `<option value="${p.id}" ${order.provider_id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
   const selectedClient = clients.find(c => c.id === order.client_id);
 
-  // Pedido Enviado o Cerrado = solo lectura. Para editar hay que volverlo a Abierto.
-  const locked = order.status === 'sent' || order.status === 'closed';
+  // Pedido Enviado/Cerrado/Cancelado = solo lectura. Para editar hay que volverlo a Abierto.
+  const locked = order.status === 'sent' || order.status === 'closed' || order.status === 'cancelled';
   const dis = locked ? 'disabled' : '';
+  const cancelled = order.status === 'cancelled';
   const lockNote = locked ? `
     <div class="order-locked-note">
       <i class="fas fa-lock"></i>
-      Pedido <strong>${STATUS_LABELS[order.status]}</strong>: solo lectura. Cambiá el estado a <strong>Abierto</strong> para editar.
+      Pedido <strong>${STATUS_LABELS[order.status]}</strong>: solo lectura.
+      ${cancelled ? 'Tocá <strong>Reactivar</strong> para volver a editarlo.'
+                  : 'Cambiá el estado a <strong>Abierto</strong> para editar.'}
     </div>` : '';
 
   return `
@@ -702,12 +746,14 @@ function buildOrderFormHTML(order, clients, providers, orderId) {
     <!-- FOOTER -->
     <div class="form-footer">
       ${(orderId && canDeleteOrders()) ? `<button type="button" class="btn btn-danger-outline" title="Eliminar" onclick="window._ord.del('${orderId}')"><i class="fas fa-trash"></i></button>` : ''}
+      ${(orderId && isAdmin() && !cancelled) ? `<button type="button" class="btn btn-danger-outline" id="btn-cancel-order" title="Cancelar pedido"><i class="fas fa-ban"></i> Cancelar pedido</button>` : ''}
+      ${(orderId && isAdmin() && cancelled) ? `<button type="button" class="btn btn-outline" id="btn-reactivate-order" title="Reactivar pedido"><i class="fas fa-rotate-left"></i> Reactivar</button>` : ''}
       <button type="button" class="btn btn-outline" id="btn-print-order" title="Imprimir / PDF"><i class="fas fa-file-pdf"></i></button>
       ${canExportExcel() ? `<button type="button" class="btn btn-outline" id="btn-excel-order" title="Exportar Excel"><i class="fas fa-file-excel"></i></button>` : ''}
-      <button type="button" id="order-status-btn" class="${statusBtnClass(order.status || 'open')}" style="margin-left:auto">
+      ${cancelled ? '' : `<button type="button" id="order-status-btn" class="${statusBtnClass(order.status || 'open')}" style="margin-left:auto">
         ${statusBtnInner(order.status || 'open')}
-      </button>
-      <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      </button>`}
+      <button type="button" class="btn btn-secondary"${cancelled ? ' style="margin-left:auto"' : ''} onclick="closeModal()">Cerrar</button>
       ${(!locked && (orderId ? canEditOrders() : canCreateOrders())) ? `<button type="submit" class="btn btn-accent"><i class="fas fa-save"></i> Guardar</button>` : ''}
     </div>
 

@@ -123,6 +123,11 @@ Deno.serve(async (req) => {
     const emails = (recProfiles || []).map((p: any) => p.email).filter((e: string) => e && e.includes('@'));
     if (!emails.length) return json({ error: 'Los destinatarios no tienen correo válido' }, 400);
 
+    // El "Para" del envío es la propia casilla remitente (GMAIL_USER). Si esa
+    // misma dirección también está entre los destinatarios configurados, se
+    // saca del BCC para no duplicar el correo (ya le llega por el "Para").
+    const bccEmails = emails.filter((e: string) => e.toLowerCase() !== GMAIL_USER.toLowerCase());
+
     // ---- Datos (los pedidos Cancelados no suman, igual que en el Dashboard) ----
     const { data: ordersRaw } = await admin.from('orders')
       .select('id, order_number, status, discount_pct, created_at, user_id, clients(name), users:profiles(name)');
@@ -187,7 +192,7 @@ Deno.serve(async (req) => {
         // oculta. Evita exponer los correos entre sí y que Gmail lo trate
         // como un envío masivo a muchos "Para" (una de las señales de spam).
         to: GMAIL_USER,
-        bcc: emails,
+        ...(bccEmails.length ? { bcc: bccEmails } : {}),
         subject,
         content: `Reporte de ventas FASTRO adjunto en PDF.\n\nVentas Totales: ${gs(totalRev)}\nTotal Ventas en Costo: ${us(totalCost)}`,
         html: cleanHtml,

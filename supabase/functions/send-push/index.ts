@@ -39,7 +39,7 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
-const STATUS_LABEL: Record<string, string> = { open: 'Abierto', sent: 'Enviado', closed: 'Cerrado' };
+const STATUS_LABEL: Record<string, string> = { open: 'Abierto', sent: 'Enviado', closed: 'Cerrado', cancelled: 'Cancelado' };
 
 // ---- VAPID: convertir las claves base64url (formato web-push) a JWK ----
 function b64urlToBytes(s: string): Uint8Array {

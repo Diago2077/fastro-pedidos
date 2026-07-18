@@ -46,9 +46,13 @@ export async function renderUsers(container) {
     enableRowClick(table, id => window._usr.view(id));
   }
 
-  function detailHTML(u, currentId) {
+  // blockSelfToggle: true cuando u es tu propia cuenta Y sos el único Admin
+  // activo — se oculta el botón para no dejar la app sin ningún administrador.
+  function detailHTML(u, currentId, blockSelfToggle = false) {
     const row = (label, val) =>
       `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${esc(val == null || val === '' ? '–' : String(val))}</span></div>`;
+    const isSelf = u.id === currentId;
+    const hideToggle = isSelf && blockSelfToggle;
     return `<div class="client-detail">
       ${row('Nombre', u.name)}
       ${row('Correo', u.email)}
@@ -57,7 +61,9 @@ export async function renderUsers(container) {
       ${row('Creado', u.created_at ? new Date(u.created_at).toLocaleDateString('es-PY') : '')}
     </div>
     <div class="form-footer">
-      ${u.id !== currentId ? `<button type="button" class="btn btn-danger-outline" style="margin-right:auto" title="${u.active ? 'Desactivar' : 'Activar'}" onclick="window._usr.toggle('${u.id}', ${u.active})"><i class="fas fa-${u.active ? 'ban' : 'check'}"></i></button>` : ''}
+      ${hideToggle
+        ? `<span class="text-muted" style="margin-right:auto;font-size:.85em"><i class="fas fa-shield-alt"></i> Sos el único Admin activo — no podés desactivarte</span>`
+        : `<button type="button" class="btn btn-danger-outline" style="margin-right:auto" title="${u.active ? 'Desactivar' : 'Activar'}" onclick="window._usr.toggle('${u.id}', ${u.active})"><i class="fas fa-${u.active ? 'ban' : 'check'}"></i></button>`}
       <button type="button" class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
       <button type="button" class="btn btn-accent" onclick="window._usr.form('${u.id}')"><i class="fas fa-edit"></i> Editar</button>
     </div>`;
@@ -161,7 +167,13 @@ export async function renderUsers(container) {
     async view(id) {
       const { data } = await db.from('profiles').select('id, name, email, role, active, created_at').eq('id', id).single();
       if (!data) { toast('No se pudo cargar el usuario', 'error'); return; }
-      openModal('Detalle del Usuario', detailHTML(data, getSession()?.id));
+      const currentId = getSession()?.id;
+      let blockSelfToggle = false;
+      if (data.id === currentId && data.role === 'admin' && data.active) {
+        const { count } = await db.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'admin').eq('active', true);
+        blockSelfToggle = (count ?? 0) <= 1;
+      }
+      openModal('Detalle del Usuario', detailHTML(data, currentId, blockSelfToggle));
     },
     async form(id) {
       const { data } = await db.from('profiles').select('*').eq('id', id).single();
@@ -216,6 +228,17 @@ export async function renderUsers(container) {
     async toggle(id, active) {
       const msg = active ? '¿Desactivar este usuario?' : '¿Reactivar este usuario?';
       if (!await confirm2(msg)) return;
+
+      // Defensiva (además del botón oculto): si te estás desactivando a vos
+      // mismo, evitar quedar la app sin ningún Admin activo.
+      if (active && id === getSession()?.id) {
+        const { count } = await db.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'admin').eq('active', true);
+        if ((count ?? 0) <= 1) {
+          toast('Sos el único administrador activo: no podés desactivarte.', 'warning');
+          return;
+        }
+      }
+
       const { error } = await db.from('profiles').update({ active: !active }).eq('id', id);
       if (error) { toast('Error: ' + error.message, 'error'); return; }
       toast(active ? 'Usuario desactivado' : 'Usuario reactivado'); closeModal(true); load();

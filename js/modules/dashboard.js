@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { fCurrency, fMoney, fDate, enableTableSort, enableColumnResize, emptyState, loadingHTML, toast, fetchAllRows } from '../utils/helpers.js';
+import { fCurrency, fMoney, fDate, enableTableSort, enableColumnResize, emptyState, loadingHTML, toast, fetchAllRows, esc } from '../utils/helpers.js';
 import { canSeeCost } from '../auth.js';
 
 const charts = {};
@@ -193,10 +193,10 @@ export async function renderDashboard(container) {
         const sub = revByOrder[o.id] || 0;
         const tot = sub * (1 - (o.discount_pct || 0) / 100);
         return `<tr>
-          <td><strong>${o.order_number}</strong></td>
-          <td>${o.clients?.name || '–'}</td>
-          <td>${o.users?.name || '–'}</td>
-          <td>${o.season || '–'}</td>
+          <td><strong>${esc(o.order_number)}</strong></td>
+          <td>${esc(o.clients?.name || '–')}</td>
+          <td>${esc(o.users?.name || '–')}</td>
+          <td>${esc(o.season || '–')}</td>
           <td>${fCurrency(tot)}</td>
           <td>${statusBadge(o.status)}</td>
           <td>${fDate(o.created_at)}</td>

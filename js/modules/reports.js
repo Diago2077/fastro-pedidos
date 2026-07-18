@@ -1,5 +1,5 @@
 import { db } from '../supabase.js';
-import { fCurrency, fNum, enableTableSort, enableColumnResize, fetchAllRows } from '../utils/helpers.js';
+import { fCurrency, fNum, enableTableSort, enableColumnResize, fetchAllRows, esc } from '../utils/helpers.js';
 import { exportPDF, exportExcel } from '../utils/export.js';
 import { canSeeCost, canExportExcel } from '../auth.js';
 
@@ -92,7 +92,7 @@ function renderSeasonReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
             ${rows.map(r => {
               const margin = r.revenue > 0 ? ((r.revenue - r.cost) / r.revenue * 100) : 0;
               return `<tr>
-                <td><strong>${r.season}</strong></td>
+                <td><strong>${esc(r.season)}</strong></td>
                 <td class="text-end">${r.orders}</td>
                 <td class="text-end">${fNum(r.qty)}</td>
                 <td class="text-end">${fCurrency(r.revenue)}</td>
@@ -179,7 +179,7 @@ function renderSellerReport(el, orders, revByOrder, costByOrder, qtyByOrder) {
             ${rows.map(r => {
               const pct = totalRevenue > 0 ? (r.revenue / totalRevenue * 100) : 0;
               return `<tr>
-                <td><strong>${r.seller}</strong></td>
+                <td><strong>${esc(r.seller)}</strong></td>
                 <td class="text-end">${r.orders}</td>
                 <td class="text-end">${fNum(r.qty)}</td>
                 <td class="text-end">${fCurrency(r.revenue)}</td>

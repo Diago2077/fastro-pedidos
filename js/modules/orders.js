@@ -127,8 +127,10 @@ export async function renderOrders(container) {
     if (error) { if (tbl) tbl.innerHTML = emptyState('Error al cargar pedidos'); toast('Error al cargar pedidos', 'error'); return; }
     _allOrders = data || [];
 
-    // Totales por pedido (order_items también puede superar las 1000 filas)
-    const { data: items } = await fetchAllRows(() => db.from('order_items').select('order_id, quantity, unit_sale_price'));
+    // Totales por pedido (order_items también puede superar las 1000 filas).
+    // .order('id'): fetchAllRows pagina con .range(), que sin un orden
+    // estable puede repetir o saltear filas entre páginas.
+    const { data: items } = await fetchAllRows(() => db.from('order_items').select('order_id, quantity, unit_sale_price').order('id'));
     _totByOrder = {};
     (items || []).forEach(i => { _totByOrder[i.order_id] = (_totByOrder[i.order_id] || 0) + i.quantity * i.unit_sale_price; });
 

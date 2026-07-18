@@ -653,7 +653,7 @@ export function openImportModal(reloadFn) {
     if (codes.length) {
       const incomingBrand = {};
       rows.forEach(r => { if (incomingBrand[r.code] === undefined) incomingBrand[r.code] = (r.brand || '').trim(); });
-      const { data: existing } = await db.from('products').select('code, brand').in('code', codes);
+      const { data: existing } = await fetchAllRows(() => db.from('products').select('code, brand').in('code', codes).order('id'));
       const norm = s => String(s || '').trim().toLowerCase();
       (existing || []).forEach(p => {
         const oldB = (p.brand || '').trim();
@@ -758,7 +758,7 @@ async function executeImport(rows) {
   const providerNames = [...new Set(rows.map(r => r.provider_name).filter(Boolean))];
   const providerMap = {};
   if (providerNames.length) {
-    const { data: existingProvs } = await db.from('providers').select('id, name').in('name', providerNames);
+    const { data: existingProvs } = await fetchAllRows(() => db.from('providers').select('id, name').in('name', providerNames).order('id'));
     existingProvs?.forEach(p => { providerMap[p.name] = p.id; });
     for (const name of providerNames) {
       if (!providerMap[name]) {
@@ -777,7 +777,7 @@ async function executeImport(rows) {
 
   // 3. Check which codes already exist
   const codes = Object.keys(groups);
-  const { data: existing } = await db.from('products').select('id, code').in('code', codes);
+  const { data: existing } = await fetchAllRows(() => db.from('products').select('id, code').in('code', codes).order('id'));
   const existingMap = Object.fromEntries((existing || []).map(p => [p.code, p.id]));
 
   // 4. Process each product

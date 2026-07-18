@@ -408,7 +408,9 @@ async function executeClientImport(rows) {
 
   // Cargar TODOS los clientes (activos e inactivos) indexados por código.
   // El código es la clave: si existe, se actualiza; si no, se crea.
-  const { data: existing } = await db.from('clients').select('id, code');
+  // fetchAllRows: sin paginar, con más de 1000 clientes se "perderían" códigos
+  // ya existentes y la importación intentaría crearlos de nuevo (duplicados).
+  const { data: existing } = await fetchAllRows(() => db.from('clients').select('id, code').order('id'));
   const byCode = {};
   (existing || []).forEach(c => { if (c.code != null) byCode[c.code] = c.id; });
 

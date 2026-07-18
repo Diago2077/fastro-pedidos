@@ -375,8 +375,10 @@ async function fetchAllSizes() {
   const PAGE = 1000;
   let from = 0;
   for (;;) {
+    // .order('id'): sin un orden estable, .range() puede repetir o saltear
+    // filas entre páginas (el resultado no está garantizado igual entre calls).
     const { data, error } = await db.from('product_variants')
-      .select('size').range(from, from + PAGE - 1);
+      .select('size').order('id').range(from, from + PAGE - 1);
     if (error || !data || !data.length) break;
     data.forEach(v => { const s = String(v.size || '').trim(); if (s) sizes.add(s); });
     if (data.length < PAGE) break;

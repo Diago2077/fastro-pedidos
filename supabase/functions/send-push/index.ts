@@ -118,7 +118,11 @@ Deno.serve(async (req) => {
         if (!targetId) return json({ error: 'Falta el usuario destinatario' }, 400);
         recipientIds = [targetId];
       }
-      payload = { title: String(body?.title || 'Mensaje'), body: message, url: '/' };
+      // Ruta relativa al scope del Service Worker (sw.js la resuelve en
+      // notificationclick). Una ruta absoluta "/" abriría la raíz del
+      // dominio en vez de la app, si esta vive en un subdirectorio
+      // (ej. GitHub Pages: usuario.github.io/repo/).
+      payload = { title: String(body?.title || 'Mensaje'), body: message, url: './' };
     } else {
       // order_status: destinatarios = notify_recipients (propios de notificaciones), menos el actor.
       const orderId = String(body?.orderId || '');
@@ -137,7 +141,10 @@ Deno.serve(async (req) => {
       payload = {
         title: `Pedido ${numero}`,
         body:  cliente ? `${cliente} · Pasó a ${estado}` : `Pasó a ${estado}`,
-        url:   '/?go=orders',
+        // Ruta relativa + hash: la app ya enruta por window.location.hash
+        // (ver navigate() en js/app.js). "/?go=orders" era absoluta (rompía
+        // en GitHub Pages) y además la app nunca leyó ese query param.
+        url:   './#orders',
       };
     }
 

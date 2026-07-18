@@ -1033,39 +1033,30 @@ async function saveOrder(originalOrder, orderId, onSavedFn, { keepOpen = false }
     discount_pct: parseFloat(fd.get('discount_pct')) || 0,
     shipping_date: fd.get('shipping_date') || (fd.get('status') === 'sent' ? todayISO() : null),
     status:       fd.get('status'),
-    observation:  fd.get('observation')  || null,
-    updated_at:   new Date().toISOString()
+    observation:  fd.get('observation')  || null
   };
 
   try {
-    let finalOrderId = orderId;
-
-    if (orderId) {
-      const { error } = await db.from('orders').update(payload).eq('id', orderId);
-      if (error) throw error;
-    } else {
-      const session = getSession();
-      const { data, error } = await db.from('orders')
-        .insert({ ...payload, user_id: session?.id })
-        .select('id').single();
-      if (error) throw error;
-      finalOrderId = data.id;
-    }
-
-    // Replace order items: delete all then re-insert
-    await db.from('order_items').delete().eq('order_id', finalOrderId);
-
-    if (_state.items.length) {
-      const itemPayloads = _state.items.map(i => ({
-        order_id:           finalOrderId,
-        product_variant_id: i.variantId,
-        quantity:           i.qty,
-        unit_sale_price:    i.salePrice,
-        unit_cost_price:    i.costPrice
-      }));
-      const { error } = await db.from('order_items').insert(itemPayloads);
-      if (error) throw error;
-    }
+    // save_order_with_items (RPC): guarda el pedido y reemplaza sus ítems
+    // en una sola transacción de Postgres. Si algo falla en el medio, no
+    // queda un pedido con los ítems borrados y sin los nuevos.
+    const { data: finalOrderId, error } = await db.rpc('save_order_with_items', {
+      p_order_id:     orderId || null,
+      p_client_id:    payload.client_id,
+      p_provider_id:  payload.provider_id,
+      p_season:       payload.season,
+      p_discount_pct: payload.discount_pct,
+      p_shipping_date: payload.shipping_date,
+      p_status:       payload.status,
+      p_observation:  payload.observation,
+      p_items: _state.items.map(i => ({
+        variant_id: i.variantId,
+        quantity:   i.qty,
+        sale_price: i.salePrice,
+        cost_price: i.costPrice
+      }))
+    });
+    if (error) throw error;
 
     _state.dirty = false;
     if (onSavedFn) onSavedFn();

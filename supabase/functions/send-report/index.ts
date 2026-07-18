@@ -51,10 +51,13 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
-// ---- formato de plata (Guaraníes, sin decimales) ----
+// ---- formato de plata ----
 // La fuente Helvetica (HTML y PDF) no tiene el glifo ₲: usamos "Gs." en el correo.
+// Ventas Totales va en guaraníes (Gs.); Total Ventas en Costo, en dólares (Us.).
 const gs = (n: number) =>
   'Gs. ' + new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(Math.round(n || 0));
+const us = (n: number) =>
+  'Us. ' + new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(Math.round(n || 0));
 
 const fDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString('es-PY') : '–';
@@ -186,7 +189,7 @@ Deno.serve(async (req) => {
         to: GMAIL_USER,
         bcc: emails,
         subject,
-        content: `Reporte de ventas FASTRO adjunto en PDF.\n\nVentas Totales: ${gs(totalRev)}\nTotal Ventas en Costo: ${gs(totalCost)}`,
+        content: `Reporte de ventas FASTRO adjunto en PDF.\n\nVentas Totales: ${gs(totalRev)}\nTotal Ventas en Costo: ${us(totalCost)}`,
         html: cleanHtml,
         attachments: [{
           filename: `reporte-ventas-${fileDate}.pdf`,
@@ -214,7 +217,7 @@ function buildHtml(totalRev: number, totalCost: number, sellerCount: number, ord
       <p style="font-size:16px;font-weight:bold;color:#111;margin:0 0 4px">FASTRO S.A.</p>
       <p style="font-size:12px;color:#888;margin:0 0 20px">Reporte de ventas · ${new Date().toLocaleDateString('es-PY')}</p>
       <p style="font-size:14px;margin:0 0 6px">Ventas Totales: <strong style="color:#9B0000">${gs(totalRev)}</strong></p>
-      <p style="font-size:14px;margin:0 0 6px">Total Ventas en Costo: <strong>${gs(totalCost)}</strong></p>
+      <p style="font-size:14px;margin:0 0 6px">Total Ventas en Costo: <strong>${us(totalCost)}</strong></p>
       <p style="font-size:14px;margin:16px 0 0">
         ${orderCount ? `${orderCount} pedido(s) en los últimos 7 días, de ${sellerCount} vendedor(es).` : 'No se crearon pedidos en los últimos 7 días.'}
       </p>
@@ -273,7 +276,7 @@ async function buildReportPdf(
   page.drawText(gs(totalRev), { x: MARGIN + 110, y, size: 11, font: fontBold, color: RED });
   y -= 18;
   page.drawText('Total Ventas en Costo:', { x: MARGIN, y, size: 11, font: fontBold, color: DARK });
-  page.drawText(gs(totalCost), { x: MARGIN + 150, y, size: 11, font: fontBold, color: DARK });
+  page.drawText(us(totalCost), { x: MARGIN + 150, y, size: 11, font: fontBold, color: DARK });
   y -= 30;
 
   page.drawText('Pedidos de los ultimos 7 dias por vendedor', { x: MARGIN, y, size: 12, font: fontBold, color: DARK });

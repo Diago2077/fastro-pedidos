@@ -43,11 +43,16 @@ let currentSection = 'dashboard';
 // BOOT
 // ============================================================
 let _authReady = false;
+let _appShown  = false; // true recién cuando se mostró la app (login exitoso al menos una vez)
 
-// Si la sesión se cierra (logout o token vencido), volver al login.
-// El guard _authReady evita recargas durante el arranque.
+// Si la sesión se cierra (logout o token vencido) DESPUÉS de haber entrado a
+// la app, volver al login recargando. Los guards evitan recargas de más:
+// - _authReady: durante el arranque (initAuth de DOMContentLoaded).
+// - _appShown: cuando login() rechaza un usuario sin perfil o inactivo y
+//   hace su propio signOut() — ahí todavía no se mostró la app, y recargar
+//   borraría el mensaje de error antes de que se pueda leer.
 db.auth.onAuthStateChange((event) => {
-  if (_authReady && event === 'SIGNED_OUT') window.location.reload();
+  if (_authReady && _appShown && event === 'SIGNED_OUT') window.location.reload();
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -101,6 +106,7 @@ function showLogin() {
 // APP
 // ============================================================
 function showApp(user) {
+  _appShown = true;
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
 
